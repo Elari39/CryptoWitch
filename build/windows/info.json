@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.1.0"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "Local",
+			"FileDescription": "Encrypted Markdown document viewer",
+			"LegalCopyright": "(c) 2026, Local",
+			"ProductName": "CryptoWitch",
+			"Comments": "Build-time encrypted Markdown vault"
+		}
+	}
+}

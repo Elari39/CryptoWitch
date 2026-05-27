@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=CryptoWitch
+Comment=A CryptoWitch application
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/cryptowitch.exe %u
+Terminal=false
+Type=Application
+Icon=cryptowitch.exe
+Categories=Utility;
+StartupWMClass=cryptowitch.exe
+
+ 

@@ -1,0 +1,9 @@
+app:
+  title: CryptoWitch
+vault:
+  password: "change-me-before-release"
+  kdf:
+    time: 3
+    memory: 65536
+    threads: 4
+    keyLen: 32
