@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	currentVaultVersion = 1
+	currentVaultVersion = 2
 	aesGCMNonceSize     = 12
 	defaultKeyLength    = 32
 )
@@ -26,71 +27,202 @@ func EncryptVault(plain PlainVault, password string, params KDFParams) (Encrypte
 	}
 	params = normalizeKDFParams(params)
 
-	payload, err := json.Marshal(plain)
-	if err != nil {
-		return EncryptedVault{}, fmt.Errorf("marshal vault: %w", err)
-	}
-
 	salt := make([]byte, 16)
 	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
 		return EncryptedVault{}, fmt.Errorf("generate salt: %w", err)
-	}
-	nonce := make([]byte, aesGCMNonceSize)
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return EncryptedVault{}, fmt.Errorf("generate nonce: %w", err)
 	}
 
 	key := deriveKey(password, salt, params)
 	defer zeroBytes(key)
 
-	block, err := aes.NewCipher(key)
+	aead, err := newAEAD(key)
 	if err != nil {
-		return EncryptedVault{}, fmt.Errorf("create cipher: %w", err)
+		return EncryptedVault{}, err
 	}
-	aead, err := cipher.NewGCM(block)
+
+	manifest := DocumentManifest{
+		Documents: make([]DocumentMetadata, 0, len(plain.Documents)),
+	}
+	encryptedDocuments := make([]EncryptedDocument, 0, len(plain.Documents))
+	for _, document := range plain.Documents {
+		metadata := normalizeDocumentMetadata(document.DocumentMetadata, len(document.Content))
+		manifest.Documents = append(manifest.Documents, metadata)
+
+		encryptedPayload, err := encryptPayload(aead, document.Content, documentAAD(metadata.ID))
+		if err != nil {
+			return EncryptedVault{}, fmt.Errorf("encrypt document %s: %w", metadata.Path, err)
+		}
+		encryptedDocuments = append(encryptedDocuments, EncryptedDocument{
+			ID:               metadata.ID,
+			EncryptedPayload: encryptedPayload,
+		})
+	}
+
+	manifestPayload, err := json.Marshal(manifest)
 	if err != nil {
-		return EncryptedVault{}, fmt.Errorf("create gcm: %w", err)
+		return EncryptedVault{}, fmt.Errorf("marshal manifest: %w", err)
+	}
+	encryptedManifest, err := encryptPayload(aead, manifestPayload, manifestAAD())
+	if err != nil {
+		return EncryptedVault{}, fmt.Errorf("encrypt manifest: %w", err)
 	}
 
 	return EncryptedVault{
-		Version:    currentVaultVersion,
-		KDF:        params,
-		Salt:       salt,
-		Nonce:      nonce,
-		Ciphertext: aead.Seal(nil, nonce, payload, nil),
+		Version:   currentVaultVersion,
+		KDF:       params,
+		Salt:      salt,
+		Manifest:  encryptedManifest,
+		Documents: encryptedDocuments,
 	}, nil
 }
 
 func DecryptVault(encrypted EncryptedVault, password string) (PlainVault, error) {
-	if password == "" || encrypted.Version != currentVaultVersion {
-		return PlainVault{}, ErrInvalidPassword
+	aead, key, err := unlockAEAD(encrypted, password)
+	if err != nil {
+		return PlainVault{}, err
 	}
-	params := normalizeKDFParams(encrypted.KDF)
-	if len(encrypted.Salt) == 0 || len(encrypted.Nonce) != aesGCMNonceSize || len(encrypted.Ciphertext) == 0 {
-		return PlainVault{}, ErrInvalidPassword
-	}
-
-	key := deriveKey(password, encrypted.Salt, params)
 	defer zeroBytes(key)
 
-	block, err := aes.NewCipher(key)
+	manifest, err := decryptManifestWithAEAD(encrypted, aead)
 	if err != nil {
 		return PlainVault{}, ErrInvalidPassword
+	}
+
+	encryptedDocuments := encryptedDocumentsByID(encrypted.Documents)
+	plain := PlainVault{Documents: make([]PlainDocument, 0, len(manifest.Documents))}
+	for _, metadata := range manifest.Documents {
+		encryptedDocument, ok := encryptedDocuments[metadata.ID]
+		if !ok {
+			return PlainVault{}, ErrInvalidPassword
+		}
+		payload, err := decryptDocumentPayloadWithAEAD(encryptedDocument, aead)
+		if err != nil {
+			return PlainVault{}, ErrInvalidPassword
+		}
+		plain.Documents = append(plain.Documents, PlainDocument{
+			DocumentMetadata: metadata,
+			Content:          payload,
+		})
+	}
+	return plain, nil
+}
+
+func decryptManifestWithPassword(encrypted EncryptedVault, password string) (DocumentManifest, cipher.AEAD, error) {
+	aead, key, err := unlockAEAD(encrypted, password)
+	if err != nil {
+		return DocumentManifest{}, nil, err
+	}
+	defer zeroBytes(key)
+	manifest, err := decryptManifestWithAEAD(encrypted, aead)
+	if err != nil {
+		return DocumentManifest{}, nil, ErrInvalidPassword
+	}
+	return manifest, aead, nil
+}
+
+func decryptManifestWithAEAD(encrypted EncryptedVault, aead cipher.AEAD) (DocumentManifest, error) {
+	payload, err := decryptPayload(aead, encrypted.Manifest, manifestAAD())
+	if err != nil {
+		return DocumentManifest{}, ErrInvalidPassword
+	}
+	var manifest DocumentManifest
+	if err := json.Unmarshal(payload, &manifest); err != nil {
+		return DocumentManifest{}, ErrInvalidPassword
+	}
+	return manifest, nil
+}
+
+func decryptDocumentPayloadWithAEAD(document EncryptedDocument, aead cipher.AEAD) ([]byte, error) {
+	return decryptPayload(aead, document.EncryptedPayload, documentAAD(document.ID))
+}
+
+func unlockAEAD(encrypted EncryptedVault, password string) (cipher.AEAD, []byte, error) {
+	if password == "" || encrypted.Version != currentVaultVersion {
+		return nil, nil, ErrInvalidPassword
+	}
+	params := normalizeKDFParams(encrypted.KDF)
+	if len(encrypted.Salt) == 0 || !validEncryptedPayload(encrypted.Manifest) {
+		return nil, nil, ErrInvalidPassword
+	}
+	key := deriveKey(password, encrypted.Salt, params)
+	aead, err := newAEAD(key)
+	if err != nil {
+		zeroBytes(key)
+		return nil, nil, ErrInvalidPassword
+	}
+	return aead, key, nil
+}
+
+func newAEAD(key []byte) (cipher.AEAD, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("create cipher: %w", err)
 	}
 	aead, err := cipher.NewGCM(block)
 	if err != nil {
-		return PlainVault{}, ErrInvalidPassword
+		return nil, fmt.Errorf("create gcm: %w", err)
 	}
-	payload, err := aead.Open(nil, encrypted.Nonce, encrypted.Ciphertext, nil)
-	if err != nil {
-		return PlainVault{}, ErrInvalidPassword
-	}
+	return aead, nil
+}
 
-	var plain PlainVault
-	if err := json.Unmarshal(payload, &plain); err != nil {
-		return PlainVault{}, ErrInvalidPassword
+func encryptPayload(aead cipher.AEAD, payload []byte, additionalData []byte) (EncryptedPayload, error) {
+	nonce := make([]byte, aesGCMNonceSize)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return EncryptedPayload{}, fmt.Errorf("generate nonce: %w", err)
+	}
+	return EncryptedPayload{
+		Nonce:      nonce,
+		Ciphertext: aead.Seal(nil, nonce, payload, additionalData),
+	}, nil
+}
+
+func decryptPayload(aead cipher.AEAD, payload EncryptedPayload, additionalData []byte) ([]byte, error) {
+	if !validEncryptedPayload(payload) {
+		return nil, ErrInvalidPassword
+	}
+	plain, err := aead.Open(nil, payload.Nonce, payload.Ciphertext, additionalData)
+	if err != nil {
+		return nil, ErrInvalidPassword
 	}
 	return plain, nil
+}
+
+func validEncryptedPayload(payload EncryptedPayload) bool {
+	return len(payload.Nonce) == aesGCMNonceSize && len(payload.Ciphertext) > 0
+}
+
+func encryptedDocumentsByID(documents []EncryptedDocument) map[string]EncryptedDocument {
+	byID := make(map[string]EncryptedDocument, len(documents))
+	for _, document := range documents {
+		byID[document.ID] = document
+	}
+	return byID
+}
+
+func normalizeDocumentMetadata(metadata DocumentMetadata, contentLength int) DocumentMetadata {
+	if metadata.DocumentType == "" {
+		metadata.DocumentType = "markdown"
+	}
+	if metadata.MimeType == "" {
+		switch metadata.DocumentType {
+		case "pdf":
+			metadata.MimeType = "application/pdf"
+		default:
+			metadata.MimeType = "text/markdown; charset=utf-8"
+		}
+	}
+	if metadata.Size == 0 {
+		metadata.Size = int64(contentLength)
+	}
+	return metadata
+}
+
+func manifestAAD() []byte {
+	return []byte("cryptowitch:manifest:v2")
+}
+
+func documentAAD(id string) []byte {
+	return []byte("cryptowitch:document:v2:" + base64.RawURLEncoding.EncodeToString([]byte(id)))
 }
 
 func deriveKey(password string, salt []byte, params KDFParams) []byte {

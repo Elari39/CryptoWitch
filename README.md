@@ -1,21 +1,24 @@
 # CryptoWitch
 
-CryptoWitch 是一个 Wails v3 + Vue3 + TypeScript 的 Windows 桌面应用示例，用于把构建期 Markdown 文档加密后嵌入单个 exe。运行时只有输入正确密码后，才会解密目录和文档内容。
+CryptoWitch 是一个 Wails v3 + Vue3 + TypeScript 的 Windows 桌面应用示例，用于把构建期 Markdown 和 PDF 文档加密后嵌入单个 exe。运行时只有输入正确密码后，才会解密文档目录；正文内容会在点击文档时按需解密和渲染。
 
 ## 主要能力
 
-- Markdown 文档构建期加密，运行时只在内存中解锁。
+- Markdown / PDF 文档构建期加密，运行时目录和单篇正文按需解锁。
 - 使用 Argon2id 派生密钥，AES-256-GCM 加密 vault。
+- 每篇文档独立加密，避免解锁时一次性把大 Markdown/PDF 全部加载进内存。
+- Markdown 渲染结果会在解锁期间缓存，重复打开同一文档不再重复高亮和转换。
 - Wails 窗口启用 `ContentProtectionEnabled`，尽量阻止系统截图和录屏捕获。
-- 前端禁用选中、复制、右键、拖拽和常见快捷键。
+- 前端提供目录搜索、文档类型和大小提示，并禁用选中、复制、右键、拖拽和常见快捷键。
 
 ## 构建流程
 
-1. 修改 `config.yaml` 中的 `vault.password`。
-2. 把 Markdown 放入 `content/plain/**/*.md`。
+1. 设置构建期密码环境变量 `CRYPTOWITCH_VAULT_PASSWORD`。
+2. 把 Markdown 或 PDF 放入 `content/plain/**/*.md`、`content/plain/**/*.pdf`。
 3. 生成密文 vault：
 
 ```bash
+export CRYPTOWITCH_VAULT_PASSWORD="123456"
 go run ./cmd/packdocs
 ```
 
@@ -38,4 +41,4 @@ go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.96 task windows:buil
 
 ## 重要限制
 
-截图/录屏保护依赖操作系统和 WebView2 能力，不是 DRM。它不能阻止外部拍照、管理员权限工具、驱动级工具或逆向分析。正式发布前不要保留示例密码和示例文档。
+截图/录屏保护依赖操作系统和 WebView2 能力，不是 DRM。它不能阻止外部拍照、管理员权限工具、驱动级工具或逆向分析。正式发布前不要保留示例文档，也不要把真实密码写入仓库、脚本或命令历史。

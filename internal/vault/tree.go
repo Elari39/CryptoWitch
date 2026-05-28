@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func BuildTree(documents []PlainDocument) []TreeNode {
+func BuildTree(documents []DocumentMetadata) []TreeNode {
 	root := make([]TreeNode, 0)
 
 	for _, document := range documents {
@@ -29,13 +29,16 @@ func splitDocumentPath(value string) []string {
 	return strings.Split(cleaned, "/")
 }
 
-func insertNode(nodes *[]TreeNode, parts []string, parentParts []string, document PlainDocument) {
+func insertNode(nodes *[]TreeNode, parts []string, parentParts []string, document DocumentMetadata) {
 	if len(parts) == 1 {
 		*nodes = append(*nodes, TreeNode{
-			ID:    document.ID,
-			Title: document.Title,
-			Path:  strings.Join(append(parentParts, parts[0]), "/"),
-			Kind:  "document",
+			ID:           document.ID,
+			Title:        document.Title,
+			Path:         strings.Join(append(parentParts, parts[0]), "/"),
+			Kind:         "document",
+			DocumentType: document.DocumentType,
+			MimeType:     document.MimeType,
+			Size:         document.Size,
 		})
 		return
 	}

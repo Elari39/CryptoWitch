@@ -8,11 +8,18 @@ export interface ReadonlyVaultTreeNode {
   readonly title: string
   readonly path: string
   readonly kind: string
+  readonly documentType?: string
+  readonly mimeType?: string
+  readonly size?: number
   readonly children?: readonly ReadonlyVaultTreeNode[]
 }
 
 export interface ReadonlyVaultDocument {
   readonly id: string
   readonly title: string
-  readonly html: string
+  readonly documentType: string
+  readonly mimeType?: string
+  readonly size: number
+  readonly html?: string
+  readonly contentBase64?: string
 }

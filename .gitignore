@@ -1,4 +1,6 @@
 .task
+.env
+.env.*
 bin
 frontend/dist/*
 !frontend/dist/.gitkeep
@@ -6,4 +8,4 @@ frontend/node_modules
 build/linux/appimage/build
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 wails_windows_*.syso
-./content/plain/*
+content/plain/*

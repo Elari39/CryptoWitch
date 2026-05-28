@@ -1,6 +1,8 @@
 package vault
 
 import (
+	"crypto/cipher"
+	"encoding/base64"
 	"errors"
 	"sync"
 )
@@ -8,41 +10,53 @@ import (
 var (
 	ErrLocked           = errors.New("vault is locked")
 	ErrDocumentNotFound = errors.New("document not found")
+	ErrUnsupportedType  = errors.New("unsupported document type")
 )
 
 type Service struct {
 	mu        sync.RWMutex
 	encrypted EncryptedVault
 	unlocked  bool
-	documents map[string]PlainDocument
+	session   uint64
+	aead      cipher.AEAD
+	documents map[string]DocumentMetadata
+	payloads  map[string]EncryptedDocument
+	htmlCache map[string]string
 	tree      []TreeNode
 }
 
 func NewService(encrypted EncryptedVault) *Service {
 	return &Service{
 		encrypted: encrypted,
-		documents: make(map[string]PlainDocument),
+		documents: make(map[string]DocumentMetadata),
+		payloads:  make(map[string]EncryptedDocument),
+		htmlCache: make(map[string]string),
 	}
 }
 
 func (s *Service) Unlock(password string) (UnlockResponse, error) {
-	plain, err := DecryptVault(s.encrypted, password)
+	manifest, aead, err := decryptManifestWithPassword(s.encrypted, password)
 	if err != nil {
 		s.clearUnlockedState()
 		return UnlockResponse{}, ErrInvalidPassword
 	}
 
-	documents := make(map[string]PlainDocument, len(plain.Documents))
-	for _, document := range plain.Documents {
+	documents := make(map[string]DocumentMetadata, len(manifest.Documents))
+	for _, document := range manifest.Documents {
 		documents[document.ID] = document
 	}
-	tree := BuildTree(plain.Documents)
+	payloads := encryptedDocumentsByID(s.encrypted.Documents)
+	tree := BuildTree(manifest.Documents)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.aead = aead
 	s.documents = documents
+	s.payloads = payloads
+	s.htmlCache = make(map[string]string)
 	s.tree = tree
 	s.unlocked = true
+	s.session++
 
 	return UnlockResponse{Tree: cloneTree(tree)}, nil
 }
@@ -55,7 +69,11 @@ func (s *Service) clearUnlockedState() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.unlocked = false
-	s.documents = make(map[string]PlainDocument)
+	s.session++
+	s.aead = nil
+	s.documents = make(map[string]DocumentMetadata)
+	s.payloads = make(map[string]EncryptedDocument)
+	s.htmlCache = make(map[string]string)
 	s.tree = nil
 }
 
@@ -75,20 +93,69 @@ func (s *Service) GetDocument(id string) (DocumentResponse, error) {
 		return DocumentResponse{}, ErrLocked
 	}
 	document, ok := s.documents[id]
+	payload, hasPayload := s.payloads[id]
+	aead := s.aead
+	cachedHTML := s.htmlCache[id]
+	session := s.session
 	s.mu.RUnlock()
-	if !ok {
+	if !ok || !hasPayload || aead == nil {
 		return DocumentResponse{}, ErrDocumentNotFound
 	}
 
-	rendered, err := RenderMarkdown(document.Content)
-	if err != nil {
-		return DocumentResponse{}, err
+	response := DocumentResponse{
+		ID:           document.ID,
+		Title:        document.Title,
+		DocumentType: document.DocumentType,
+		MimeType:     document.MimeType,
+		Size:         document.Size,
 	}
-	return DocumentResponse{
-		ID:    document.ID,
-		Title: document.Title,
-		HTML:  rendered,
-	}, nil
+	switch document.DocumentType {
+	case "", "markdown":
+		if cachedHTML == "" {
+			content, err := decryptDocumentPayloadWithAEAD(payload, aead)
+			if err != nil {
+				return DocumentResponse{}, ErrInvalidPassword
+			}
+			rendered, err := RenderMarkdown(string(content))
+			zeroBytes(content)
+			if err != nil {
+				return DocumentResponse{}, err
+			}
+			cachedHTML = rendered
+			s.cacheMarkdownHTML(id, rendered, session)
+		}
+		response.DocumentType = "markdown"
+		response.MimeType = "text/markdown; charset=utf-8"
+		response.HTML = cachedHTML
+	case "pdf":
+		content, err := decryptDocumentPayloadWithAEAD(payload, aead)
+		if err != nil {
+			return DocumentResponse{}, ErrInvalidPassword
+		}
+		response.MimeType = "application/pdf"
+		response.ContentBase64 = base64.StdEncoding.EncodeToString(content)
+		zeroBytes(content)
+	default:
+		return DocumentResponse{}, ErrUnsupportedType
+	}
+	if !s.isCurrentSession(session) {
+		return DocumentResponse{}, ErrLocked
+	}
+	return response, nil
+}
+
+func (s *Service) cacheMarkdownHTML(id string, html string, session uint64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.unlocked && s.session == session {
+		s.htmlCache[id] = html
+	}
+}
+
+func (s *Service) isCurrentSession(session uint64) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.unlocked && s.session == session
 }
 
 func cloneTree(nodes []TreeNode) []TreeNode {

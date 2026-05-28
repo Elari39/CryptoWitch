@@ -1,7 +1,6 @@
 app:
   title: CryptoWitch
 vault:
-  password: "Elaina"
   kdf:
     time: 3
     memory: 65536

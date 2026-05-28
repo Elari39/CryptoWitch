@@ -3,16 +3,22 @@ package vault
 import "testing"
 
 func TestBuildTreeUsesNormalizedFullPaths(t *testing.T) {
-	tree := BuildTree([]PlainDocument{
+	tree := BuildTree([]DocumentMetadata{
 		{
-			ID:    "nested",
-			Title: "Nested",
-			Path:  `guide\advanced\nested.md`,
+			ID:           "nested",
+			Title:        "Nested",
+			Path:         `guide\advanced\nested.md`,
+			DocumentType: "markdown",
+			MimeType:     "text/markdown; charset=utf-8",
+			Size:         42,
 		},
 		{
-			ID:    "intro",
-			Title: "Intro",
-			Path:  "./guide/intro.md",
+			ID:           "intro",
+			Title:        "Intro",
+			Path:         "./guide/intro.md",
+			DocumentType: "pdf",
+			MimeType:     "application/pdf",
+			Size:         99,
 		},
 	})
 
@@ -36,7 +42,7 @@ func TestBuildTreeUsesNormalizedFullPaths(t *testing.T) {
 	}
 
 	intro := guide.Children[1]
-	if intro.Kind != "document" || intro.ID != "intro" || intro.Path != "guide/intro.md" {
+	if intro.Kind != "document" || intro.ID != "intro" || intro.Path != "guide/intro.md" || intro.Size != 99 {
 		t.Fatalf("intro node = %#v, want document path guide/intro.md", intro)
 	}
 }

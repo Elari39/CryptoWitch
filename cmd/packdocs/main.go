@@ -17,13 +17,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const vaultPasswordEnv = "CRYPTOWITCH_VAULT_PASSWORD"
+
 type appConfig struct {
 	App struct {
 		Title string `yaml:"title"`
 	} `yaml:"app"`
 	Vault struct {
-		Password string `yaml:"password"`
-		KDF      struct {
+		KDF struct {
 			Time    uint32 `yaml:"time"`
 			Memory  uint32 `yaml:"memory"`
 			Threads uint8  `yaml:"threads"`
@@ -54,10 +55,14 @@ func run(configPath, contentDir, outputPath string) error {
 		return err
 	}
 	if len(documents) == 0 {
-		return errors.New("no markdown documents found")
+		return errors.New("no supported documents found")
+	}
+	password := os.Getenv(vaultPasswordEnv)
+	if password == "" {
+		return fmt.Errorf("%s is required", vaultPasswordEnv)
 	}
 
-	encrypted, err := vault.EncryptVault(vault.PlainVault{Documents: documents}, config.Vault.Password, vault.KDFParams{
+	encrypted, err := vault.EncryptVault(vault.PlainVault{Documents: documents}, password, vault.KDFParams{
 		Time:    config.Vault.KDF.Time,
 		Memory:  config.Vault.KDF.Memory,
 		Threads: config.Vault.KDF.Threads,
@@ -89,9 +94,6 @@ func readConfig(path string) (appConfig, error) {
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return appConfig{}, fmt.Errorf("parse config: %w", err)
 	}
-	if config.Vault.Password == "" {
-		return appConfig{}, errors.New("vault.password is required")
-	}
 	return config, nil
 }
 
@@ -101,7 +103,7 @@ func readDocuments(root string) ([]vault.PlainDocument, error) {
 		if walkErr != nil {
 			return walkErr
 		}
-		if entry.IsDir() || strings.ToLower(filepath.Ext(entry.Name())) != ".md" {
+		if entry.IsDir() || !isSupportedDocument(entry.Name()) {
 			return nil
 		}
 
@@ -114,12 +116,7 @@ func readDocuments(root string) ([]vault.PlainDocument, error) {
 			return fmt.Errorf("resolve document path %s: %w", path, err)
 		}
 		normalizedPath := filepath.ToSlash(relative)
-		documents = append(documents, vault.PlainDocument{
-			ID:      documentID(normalizedPath),
-			Title:   documentTitle(entry.Name(), string(data)),
-			Path:    normalizedPath,
-			Content: string(data),
-		})
+		documents = append(documents, plainDocument(entry.Name(), normalizedPath, data))
 		return nil
 	})
 	if err != nil {
@@ -129,6 +126,45 @@ func readDocuments(root string) ([]vault.PlainDocument, error) {
 		return documents[i].Path < documents[j].Path
 	})
 	return documents, nil
+}
+
+func isSupportedDocument(filename string) bool {
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".md", ".pdf":
+		return true
+	default:
+		return false
+	}
+}
+
+func plainDocument(filename string, normalizedPath string, data []byte) vault.PlainDocument {
+	extension := strings.ToLower(filepath.Ext(filename))
+	switch extension {
+	case ".pdf":
+		return vault.PlainDocument{
+			DocumentMetadata: vault.DocumentMetadata{
+				ID:           documentID(normalizedPath),
+				Title:        strings.TrimSuffix(filename, filepath.Ext(filename)),
+				Path:         normalizedPath,
+				DocumentType: "pdf",
+				MimeType:     "application/pdf",
+				Size:         int64(len(data)),
+			},
+			Content: data,
+		}
+	default:
+		return vault.PlainDocument{
+			DocumentMetadata: vault.DocumentMetadata{
+				ID:           documentID(normalizedPath),
+				Title:        documentTitle(filename, string(data)),
+				Path:         normalizedPath,
+				DocumentType: "markdown",
+				MimeType:     "text/markdown; charset=utf-8",
+				Size:         int64(len(data)),
+			},
+			Content: data,
+		}
+	}
 }
 
 func documentID(path string) string {
@@ -158,9 +194,22 @@ func renderGeneratedVault(encrypted vault.EncryptedVault) ([]byte, error) {
 	buffer.WriteString(fmt.Sprintf("\t\tThreads: %d,\n", encrypted.KDF.Threads))
 	buffer.WriteString(fmt.Sprintf("\t\tKeyLen: %d,\n", encrypted.KDF.KeyLen))
 	buffer.WriteString("\t},\n")
-	buffer.WriteString(fmt.Sprintf("\tSalt:       %s,\n", byteSliceLiteral(encrypted.Salt)))
-	buffer.WriteString(fmt.Sprintf("\tNonce:      %s,\n", byteSliceLiteral(encrypted.Nonce)))
-	buffer.WriteString(fmt.Sprintf("\tCiphertext: %s,\n", byteSliceLiteral(encrypted.Ciphertext)))
+	buffer.WriteString(fmt.Sprintf("\tSalt: %s,\n", byteSliceLiteral(encrypted.Salt)))
+	buffer.WriteString("\tManifest: EncryptedPayload{\n")
+	buffer.WriteString(fmt.Sprintf("\t\tNonce:      %s,\n", byteSliceLiteral(encrypted.Manifest.Nonce)))
+	buffer.WriteString(fmt.Sprintf("\t\tCiphertext: %s,\n", chunkedByteSliceLiteral(encrypted.Manifest.Ciphertext)))
+	buffer.WriteString("\t},\n")
+	buffer.WriteString("\tDocuments: []EncryptedDocument{\n")
+	for _, document := range encrypted.Documents {
+		buffer.WriteString("\t\t{\n")
+		buffer.WriteString(fmt.Sprintf("\t\t\tID: %q,\n", document.ID))
+		buffer.WriteString("\t\t\tEncryptedPayload: EncryptedPayload{\n")
+		buffer.WriteString(fmt.Sprintf("\t\t\t\tNonce:      %s,\n", byteSliceLiteral(document.Nonce)))
+		buffer.WriteString(fmt.Sprintf("\t\t\t\tCiphertext: %s,\n", chunkedByteSliceLiteral(document.Ciphertext)))
+		buffer.WriteString("\t\t\t},\n")
+		buffer.WriteString("\t\t},\n")
+	}
+	buffer.WriteString("\t},\n")
 	buffer.WriteString("}\n")
 
 	formatted, err := format.Source(buffer.Bytes())
@@ -171,6 +220,9 @@ func renderGeneratedVault(encrypted vault.EncryptedVault) ([]byte, error) {
 }
 
 func byteSliceLiteral(data []byte) string {
+	if len(data) > 96 {
+		return chunkedByteSliceLiteral(data)
+	}
 	var buffer bytes.Buffer
 	buffer.WriteString("[]byte{")
 	for i, value := range data {
@@ -180,5 +232,24 @@ func byteSliceLiteral(data []byte) string {
 		buffer.WriteString(fmt.Sprintf("0x%02x", value))
 	}
 	buffer.WriteString("}")
+	return buffer.String()
+}
+
+func chunkedByteSliceLiteral(data []byte) string {
+	const bytesPerLine = 16
+	var buffer bytes.Buffer
+	buffer.WriteString("[]byte{\n")
+	for i, value := range data {
+		if i%bytesPerLine == 0 {
+			buffer.WriteString("\t\t\t")
+		}
+		buffer.WriteString(fmt.Sprintf("0x%02x,", value))
+		if i%bytesPerLine == bytesPerLine-1 || i == len(data)-1 {
+			buffer.WriteString("\n")
+		} else {
+			buffer.WriteString(" ")
+		}
+	}
+	buffer.WriteString("\t\t}")
 	return buffer.String()
 }

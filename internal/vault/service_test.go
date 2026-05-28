@@ -11,10 +11,26 @@ func testService(t *testing.T) *Service {
 	encrypted, err := EncryptVault(PlainVault{
 		Documents: []PlainDocument{
 			{
-				ID:      "intro",
-				Title:   "Intro",
-				Path:    "guide/intro.md",
-				Content: "# Intro\n\nHello **CryptoWitch**.\n<script>alert('x')</script>",
+				DocumentMetadata: DocumentMetadata{
+					ID:           "intro",
+					Title:        "Intro",
+					Path:         "guide/intro.md",
+					DocumentType: "markdown",
+					MimeType:     "text/markdown; charset=utf-8",
+					Size:         int64(len("# Intro\n\nHello **CryptoWitch**.\n<script>alert('x')</script>")),
+				},
+				Content: []byte("# Intro\n\nHello **CryptoWitch**.\n<script>alert('x')</script>"),
+			},
+			{
+				DocumentMetadata: DocumentMetadata{
+					ID:           "pdf",
+					Title:        "Guide PDF",
+					Path:         "guide/guide.pdf",
+					DocumentType: "pdf",
+					MimeType:     "application/pdf",
+					Size:         int64(len("%PDF-1.4")),
+				},
+				Content: []byte("%PDF-1.4"),
 			},
 		},
 	}, "correct-password", KDFParams{Time: 1, Memory: 64 * 1024, Threads: 1, KeyLen: 32})
@@ -33,6 +49,9 @@ func TestUnlockWithCorrectPassword(t *testing.T) {
 	}
 	if len(response.Tree) != 1 || response.Tree[0].Kind != "folder" {
 		t.Fatalf("unexpected tree: %#v", response.Tree)
+	}
+	if len(service.documents) != 2 || len(service.payloads) != 2 {
+		t.Fatalf("unlock should keep metadata and encrypted payload handles only")
 	}
 }
 
@@ -89,6 +108,81 @@ func TestGetDocumentNotFound(t *testing.T) {
 	}
 	if _, err := service.GetDocument("missing"); !errors.Is(err, ErrDocumentNotFound) {
 		t.Fatalf("GetDocument() error = %v, want ErrDocumentNotFound", err)
+	}
+}
+
+func TestGetMarkdownDocument(t *testing.T) {
+	service := testService(t)
+
+	if _, err := service.Unlock("correct-password"); err != nil {
+		t.Fatalf("Unlock() error = %v", err)
+	}
+	document, err := service.GetDocument("intro")
+	if err != nil {
+		t.Fatalf("GetDocument() error = %v", err)
+	}
+	if document.DocumentType != "markdown" {
+		t.Fatalf("DocumentType = %q, want markdown", document.DocumentType)
+	}
+	if document.MimeType != "text/markdown; charset=utf-8" {
+		t.Fatalf("MimeType = %q, want text/markdown; charset=utf-8", document.MimeType)
+	}
+	if document.Size == 0 {
+		t.Fatal("Size is empty")
+	}
+	if document.HTML == "" {
+		t.Fatal("HTML is empty")
+	}
+	if document.ContentBase64 != "" {
+		t.Fatalf("ContentBase64 = %q, want empty for markdown", document.ContentBase64)
+	}
+}
+
+func TestGetPDFDocument(t *testing.T) {
+	service := testService(t)
+
+	if _, err := service.Unlock("correct-password"); err != nil {
+		t.Fatalf("Unlock() error = %v", err)
+	}
+	document, err := service.GetDocument("pdf")
+	if err != nil {
+		t.Fatalf("GetDocument() error = %v", err)
+	}
+	if document.DocumentType != "pdf" {
+		t.Fatalf("DocumentType = %q, want pdf", document.DocumentType)
+	}
+	if document.MimeType != "application/pdf" {
+		t.Fatalf("MimeType = %q, want application/pdf", document.MimeType)
+	}
+	if document.ContentBase64 != "JVBERi0xLjQ=" {
+		t.Fatalf("ContentBase64 = %q, want embedded PDF payload", document.ContentBase64)
+	}
+	if document.Size != int64(len("%PDF-1.4")) {
+		t.Fatalf("Size = %d, want %d", document.Size, len("%PDF-1.4"))
+	}
+	if document.HTML != "" {
+		t.Fatalf("HTML = %q, want empty for PDF", document.HTML)
+	}
+}
+
+func TestGetMarkdownDocumentUsesRenderCache(t *testing.T) {
+	service := testService(t)
+
+	if _, err := service.Unlock("correct-password"); err != nil {
+		t.Fatalf("Unlock() error = %v", err)
+	}
+	if _, err := service.GetDocument("intro"); err != nil {
+		t.Fatalf("GetDocument() error = %v", err)
+	}
+	if cached := service.htmlCache["intro"]; cached == "" {
+		t.Fatal("expected cached markdown HTML")
+	}
+	if _, err := service.GetDocument("intro"); err != nil {
+		t.Fatalf("GetDocument() cached error = %v", err)
+	}
+	service.Lock()
+	if len(service.htmlCache) != 0 {
+		t.Fatalf("htmlCache len = %d, want cleared after lock", len(service.htmlCache))
 	}
 }
 

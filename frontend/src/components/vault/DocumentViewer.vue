@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, shallowRef, watch } from 'vue'
 import type { VaultDocument } from '../../types/vault'
 
 interface Props {
@@ -9,6 +9,38 @@ interface Props {
 
 const props = defineProps<Props>()
 const viewerRef = shallowRef<HTMLElement | null>(null)
+const pdfUrl = shallowRef('')
+const pdfLoaded = shallowRef(false)
+const fileSizeLabel = computed(() => formatSize(props.document?.size))
+
+function revokePDFURL() {
+  if (pdfUrl.value) {
+    URL.revokeObjectURL(pdfUrl.value)
+    pdfUrl.value = ''
+  }
+}
+
+function base64ToBlobURL(contentBase64: string, mimeType: string) {
+  const binary = window.atob(contentBase64)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  return URL.createObjectURL(new Blob([bytes], { type: mimeType }))
+}
+
+function formatSize(size?: number) {
+  if (!size || size <= 0) {
+    return '未知大小'
+  }
+  if (size < 1024) {
+    return `${size} B`
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`
+  }
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
 
 watch(
   () => props.document?.id,
@@ -20,21 +52,50 @@ watch(
     viewerRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
   },
 )
+
+watch(
+  () => props.document,
+  (document) => {
+    revokePDFURL()
+    pdfLoaded.value = false
+    if (document?.documentType === 'pdf' && document.contentBase64) {
+      pdfUrl.value = base64ToBlobURL(document.contentBase64, document.mimeType || 'application/pdf')
+    }
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(revokePDFURL)
 </script>
 
 <template>
   <section ref="viewerRef" class="viewer" aria-live="polite">
     <div v-if="loading" class="viewer-state">正在加载文档...</div>
+    <article v-else-if="document?.documentType === 'pdf'" class="pdf-view">
+      <header class="document-header pdf-header">
+        <div>
+          <p class="document-kicker">PDF</p>
+          <h1 class="document-title">{{ document.title }}</h1>
+        </div>
+        <p class="document-size">{{ fileSizeLabel }}</p>
+      </header>
+      <div v-if="pdfUrl" class="pdf-frame-wrap">
+        <div v-if="!pdfLoaded" class="pdf-loading">正在打开 PDF...</div>
+        <iframe class="pdf-frame" :src="pdfUrl" :title="document.title" @load="pdfLoaded = true"></iframe>
+      </div>
+      <div v-else class="viewer-state">PDF 加载失败，请重新选择文档。</div>
+    </article>
     <article v-else-if="document" class="markdown-view">
       <header class="document-header">
         <p class="document-kicker">Markdown</p>
         <h1 class="document-title">{{ document.title }}</h1>
+        <p class="document-size markdown-size">{{ fileSizeLabel }}</p>
       </header>
       <div class="markdown-body" v-html="document.html"></div>
     </article>
     <div v-else class="viewer-state">
-      <p class="state-title">请选择一篇文档</p>
-      <p class="state-copy">目录加载完成后，内容只会在你点击文档时解密渲染。</p>
+      <p class="state-title">请选择一篇文档或 PDF</p>
+      <p class="state-copy">目录加载完成后，内容只会在你点击条目时解密渲染。</p>
     </div>
   </section>
 </template>
@@ -97,6 +158,56 @@ watch(
   padding: 48px 56px 72px;
 }
 
+.pdf-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  background: #1b2230;
+}
+
+.pdf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+  padding: 18px 24px;
+  border-bottom: 1px solid #313c4f;
+  background: #111722;
+}
+
+.pdf-header .document-kicker {
+  color: #85c7bc;
+}
+
+.pdf-header .document-title {
+  color: #f5f0e8;
+  font-size: 22px;
+}
+
+.pdf-frame-wrap {
+  position: relative;
+  min-height: 0;
+}
+
+.pdf-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  color: #b8c6d8;
+  background: #1b2230;
+}
+
+.pdf-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  background: #2a3140;
+}
+
 .document-header {
   margin-bottom: 28px;
   padding-bottom: 20px;
@@ -116,6 +227,18 @@ watch(
   color: #101820;
   font-size: 34px;
   line-height: 1.2;
+}
+
+.document-size {
+  margin: 0;
+  color: #9caabd;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.markdown-size {
+  margin-top: 8px;
+  color: #697386;
 }
 
 .markdown-body {

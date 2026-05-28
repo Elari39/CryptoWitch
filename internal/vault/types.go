@@ -8,11 +8,34 @@ type KDFParams struct {
 }
 
 type EncryptedVault struct {
-	Version    int       `json:"version"`
-	KDF        KDFParams `json:"kdf"`
-	Salt       []byte    `json:"salt"`
-	Nonce      []byte    `json:"nonce"`
-	Ciphertext []byte    `json:"ciphertext"`
+	Version   int                 `json:"version"`
+	KDF       KDFParams           `json:"kdf"`
+	Salt      []byte              `json:"salt"`
+	Manifest  EncryptedPayload    `json:"manifest"`
+	Documents []EncryptedDocument `json:"documents"`
+}
+
+type EncryptedPayload struct {
+	Nonce      []byte `json:"nonce"`
+	Ciphertext []byte `json:"ciphertext"`
+}
+
+type EncryptedDocument struct {
+	ID string `json:"id"`
+	EncryptedPayload
+}
+
+type DocumentMetadata struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Path         string `json:"path"`
+	DocumentType string `json:"documentType"`
+	MimeType     string `json:"mimeType,omitempty"`
+	Size         int64  `json:"size"`
+}
+
+type DocumentManifest struct {
+	Documents []DocumentMetadata `json:"documents"`
 }
 
 type PlainVault struct {
@@ -20,24 +43,29 @@ type PlainVault struct {
 }
 
 type PlainDocument struct {
-	ID      string `json:"id"`
-	Title   string `json:"title"`
-	Path    string `json:"path"`
-	Content string `json:"content"`
+	DocumentMetadata
+	Content []byte `json:"content,omitempty"`
 }
 
 type TreeNode struct {
-	ID       string     `json:"id,omitempty"`
-	Title    string     `json:"title"`
-	Path     string     `json:"path"`
-	Kind     string     `json:"kind"`
-	Children []TreeNode `json:"children,omitempty"`
+	ID           string     `json:"id,omitempty"`
+	Title        string     `json:"title"`
+	Path         string     `json:"path"`
+	Kind         string     `json:"kind"`
+	DocumentType string     `json:"documentType,omitempty"`
+	MimeType     string     `json:"mimeType,omitempty"`
+	Size         int64      `json:"size,omitempty"`
+	Children     []TreeNode `json:"children,omitempty"`
 }
 
 type DocumentResponse struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
-	HTML  string `json:"html"`
+	ID            string `json:"id"`
+	Title         string `json:"title"`
+	DocumentType  string `json:"documentType"`
+	MimeType      string `json:"mimeType,omitempty"`
+	Size          int64  `json:"size"`
+	HTML          string `json:"html,omitempty"`
+	ContentBase64 string `json:"contentBase64,omitempty"`
 }
 
 type UnlockResponse struct {
