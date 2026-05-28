@@ -1,33 +1,24 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, shallowRef, watch } from 'vue'
-import type { VaultDocument } from '../../types/vault'
+import { computed, nextTick, shallowRef, watch } from 'vue'
+import type { PDFLoadState, VaultDocument } from '../../types/vault'
 
 interface Props {
   document: VaultDocument | null
   loading: boolean
+  pdfLoad: PDFLoadState
+  pdfProgress: number
 }
 
 const props = defineProps<Props>()
 const viewerRef = shallowRef<HTMLElement | null>(null)
-const pdfUrl = shallowRef('')
 const pdfLoaded = shallowRef(false)
 const fileSizeLabel = computed(() => formatSize(props.document?.size))
-
-function revokePDFURL() {
-  if (pdfUrl.value) {
-    URL.revokeObjectURL(pdfUrl.value)
-    pdfUrl.value = ''
+const pdfLoadingLabel = computed(() => {
+  if (props.pdfLoad.totalChunks > 1) {
+    return `正在加载 PDF ${props.pdfProgress}%（${props.pdfLoad.loadedChunks}/${props.pdfLoad.totalChunks}）`
   }
-}
-
-function base64ToBlobURL(contentBase64: string, mimeType: string) {
-  const binary = window.atob(contentBase64)
-  const bytes = new Uint8Array(binary.length)
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index)
-  }
-  return URL.createObjectURL(new Blob([bytes], { type: mimeType }))
-}
+  return '正在打开 PDF...'
+})
 
 function formatSize(size?: number) {
   if (!size || size <= 0) {
@@ -55,17 +46,11 @@ watch(
 
 watch(
   () => props.document,
-  (document) => {
-    revokePDFURL()
+  () => {
     pdfLoaded.value = false
-    if (document?.documentType === 'pdf' && document.contentBase64) {
-      pdfUrl.value = base64ToBlobURL(document.contentBase64, document.mimeType || 'application/pdf')
-    }
   },
   { immediate: true },
 )
-
-onBeforeUnmount(revokePDFURL)
 </script>
 
 <template>
@@ -79,11 +64,19 @@ onBeforeUnmount(revokePDFURL)
         </div>
         <p class="document-size">{{ fileSizeLabel }}</p>
       </header>
-      <div v-if="pdfUrl" class="pdf-frame-wrap">
+      <div v-if="pdfLoad.url" class="pdf-frame-wrap">
         <div v-if="!pdfLoaded" class="pdf-loading">正在打开 PDF...</div>
-        <iframe class="pdf-frame" :src="pdfUrl" :title="document.title" @load="pdfLoaded = true"></iframe>
+        <iframe class="pdf-frame" :src="pdfLoad.url" :title="document.title" @load="pdfLoaded = true"></iframe>
       </div>
-      <div v-else class="viewer-state">PDF 加载失败，请重新选择文档。</div>
+      <div v-else class="viewer-state">
+        <p class="state-title">{{ pdfLoadingLabel }}</p>
+        <progress
+          v-if="pdfLoad.totalChunks > 1"
+          class="pdf-progress"
+          :max="pdfLoad.totalChunks"
+          :value="pdfLoad.loadedChunks"
+        />
+      </div>
     </article>
     <article v-else-if="document" class="markdown-view">
       <header class="document-header">
@@ -198,6 +191,12 @@ onBeforeUnmount(revokePDFURL)
   place-content: center;
   color: #b8c6d8;
   background: #1b2230;
+}
+
+.pdf-progress {
+  width: min(320px, 70vw);
+  height: 10px;
+  accent-color: #85c7bc;
 }
 
 .pdf-frame {

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"cryptowitch/internal/vault"
 )
 
 func TestRunRequiresPasswordEnvironment(t *testing.T) {
@@ -74,6 +76,37 @@ func TestRunErrorsWhenNoSupportedDocumentsFound(t *testing.T) {
 	err := run(configPath, contentDir, filepath.Join(root, "generated.go"))
 	if err == nil || !strings.Contains(err.Error(), "no supported documents found") {
 		t.Fatalf("run() error = %v, want no supported documents found", err)
+	}
+}
+
+func TestRenderGeneratedVaultIncludesPDFChunks(t *testing.T) {
+	documents := []vault.PlainDocument{
+		{
+			DocumentMetadata: vault.DocumentMetadata{
+				ID:           "pdf",
+				Title:        "Manual",
+				Path:         "manual.pdf",
+				DocumentType: "pdf",
+				MimeType:     "application/pdf",
+				Size:         int64(len("%PDF-1.4")),
+			},
+			Content: []byte("%PDF-1.4"),
+		},
+	}
+	encrypted, err := vault.EncryptVault(vault.PlainVault{Documents: documents}, "password", vault.KDFParams{Time: 1, Memory: 64 * 1024, Threads: 1, KeyLen: 32})
+	if err != nil {
+		t.Fatalf("EncryptVault() error = %v", err)
+	}
+	generated, err := renderGeneratedVault(encrypted)
+	if err != nil {
+		t.Fatalf("renderGeneratedVault() error = %v", err)
+	}
+	source := string(generated)
+	if !strings.Contains(source, "Version: 3") {
+		t.Fatalf("generated source missing v3 marker: %s", source)
+	}
+	if !strings.Contains(source, "Chunks: []EncryptedPayload") {
+		t.Fatalf("generated source missing PDF chunks: %s", source)
 	}
 }
 

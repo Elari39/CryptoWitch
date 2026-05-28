@@ -22,4 +22,15 @@ export interface ReadonlyVaultDocument {
   readonly size: number
   readonly html?: string
   readonly contentBase64?: string
+  readonly chunked?: boolean
+  readonly chunkSize?: number
+  readonly chunkCount?: number
+}
+
+export interface PDFLoadState {
+  readonly url: string
+  readonly loadedChunks: number
+  readonly totalChunks: number
+  readonly loadedBytes: number
+  readonly totalBytes: number
 }

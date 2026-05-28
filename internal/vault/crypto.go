@@ -14,9 +14,11 @@ import (
 )
 
 const (
-	currentVaultVersion = 2
+	currentVaultVersion = 3
+	legacyVaultVersion  = 2
 	aesGCMNonceSize     = 12
 	defaultKeyLength    = 32
+	defaultPDFChunkSize = 1024 * 1024
 )
 
 var ErrInvalidPassword = errors.New("invalid password or vault data")
@@ -46,23 +48,32 @@ func EncryptVault(plain PlainVault, password string, params KDFParams) (Encrypte
 	encryptedDocuments := make([]EncryptedDocument, 0, len(plain.Documents))
 	for _, document := range plain.Documents {
 		metadata := normalizeDocumentMetadata(document.DocumentMetadata, len(document.Content))
-		manifest.Documents = append(manifest.Documents, metadata)
-
-		encryptedPayload, err := encryptPayload(aead, document.Content, documentAAD(metadata.ID))
-		if err != nil {
-			return EncryptedVault{}, fmt.Errorf("encrypt document %s: %w", metadata.Path, err)
+		encryptedDocument := EncryptedDocument{ID: metadata.ID}
+		if metadata.DocumentType == "pdf" {
+			metadata.Chunked = true
+			metadata.ChunkSize = defaultPDFChunkSize
+			metadata.ChunkCount = chunkCount(len(document.Content), defaultPDFChunkSize)
+			chunks, err := encryptDocumentChunks(aead, metadata.ID, document.Content, defaultPDFChunkSize)
+			if err != nil {
+				return EncryptedVault{}, fmt.Errorf("encrypt document %s: %w", metadata.Path, err)
+			}
+			encryptedDocument.Chunks = chunks
+		} else {
+			encryptedPayload, err := encryptPayload(aead, document.Content, documentAAD(currentVaultVersion, metadata.ID))
+			if err != nil {
+				return EncryptedVault{}, fmt.Errorf("encrypt document %s: %w", metadata.Path, err)
+			}
+			encryptedDocument.EncryptedPayload = encryptedPayload
 		}
-		encryptedDocuments = append(encryptedDocuments, EncryptedDocument{
-			ID:               metadata.ID,
-			EncryptedPayload: encryptedPayload,
-		})
+		manifest.Documents = append(manifest.Documents, metadata)
+		encryptedDocuments = append(encryptedDocuments, encryptedDocument)
 	}
 
 	manifestPayload, err := json.Marshal(manifest)
 	if err != nil {
 		return EncryptedVault{}, fmt.Errorf("marshal manifest: %w", err)
 	}
-	encryptedManifest, err := encryptPayload(aead, manifestPayload, manifestAAD())
+	encryptedManifest, err := encryptPayload(aead, manifestPayload, manifestAAD(currentVaultVersion))
 	if err != nil {
 		return EncryptedVault{}, fmt.Errorf("encrypt manifest: %w", err)
 	}
@@ -95,7 +106,7 @@ func DecryptVault(encrypted EncryptedVault, password string) (PlainVault, error)
 		if !ok {
 			return PlainVault{}, ErrInvalidPassword
 		}
-		payload, err := decryptDocumentPayloadWithAEAD(encryptedDocument, aead)
+		payload, err := decryptDocumentPayloadWithAEAD(encrypted.Version, encryptedDocument, metadata, aead)
 		if err != nil {
 			return PlainVault{}, ErrInvalidPassword
 		}
@@ -121,7 +132,7 @@ func decryptManifestWithPassword(encrypted EncryptedVault, password string) (Doc
 }
 
 func decryptManifestWithAEAD(encrypted EncryptedVault, aead cipher.AEAD) (DocumentManifest, error) {
-	payload, err := decryptPayload(aead, encrypted.Manifest, manifestAAD())
+	payload, err := decryptPayload(aead, encrypted.Manifest, manifestAAD(encrypted.Version))
 	if err != nil {
 		return DocumentManifest{}, ErrInvalidPassword
 	}
@@ -132,12 +143,46 @@ func decryptManifestWithAEAD(encrypted EncryptedVault, aead cipher.AEAD) (Docume
 	return manifest, nil
 }
 
-func decryptDocumentPayloadWithAEAD(document EncryptedDocument, aead cipher.AEAD) ([]byte, error) {
-	return decryptPayload(aead, document.EncryptedPayload, documentAAD(document.ID))
+func decryptDocumentPayloadWithAEAD(version int, document EncryptedDocument, metadata DocumentMetadata, aead cipher.AEAD) ([]byte, error) {
+	if metadata.Chunked {
+		return decryptDocumentChunksWithAEAD(version, document, metadata, aead)
+	}
+	return decryptPayload(aead, document.EncryptedPayload, documentAAD(version, document.ID))
+}
+
+func decryptDocumentChunkWithAEAD(version int, document EncryptedDocument, metadata DocumentMetadata, index int, aead cipher.AEAD) ([]byte, error) {
+	if !metadata.Chunked || len(document.Chunks) == 0 {
+		return nil, ErrInvalidPassword
+	}
+	if index < 0 || index >= len(document.Chunks) || index >= metadata.ChunkCount {
+		return nil, ErrInvalidPassword
+	}
+	return decryptPayload(aead, document.Chunks[index], documentChunkAAD(version, document.ID, index))
+}
+
+func decryptDocumentChunksWithAEAD(version int, document EncryptedDocument, metadata DocumentMetadata, aead cipher.AEAD) ([]byte, error) {
+	if metadata.ChunkCount != len(document.Chunks) {
+		return nil, ErrInvalidPassword
+	}
+	plain := make([]byte, 0, metadata.Size)
+	for index := range document.Chunks {
+		chunk, err := decryptDocumentChunkWithAEAD(version, document, metadata, index, aead)
+		if err != nil {
+			zeroBytes(plain)
+			return nil, err
+		}
+		plain = append(plain, chunk...)
+		zeroBytes(chunk)
+	}
+	if int64(len(plain)) != metadata.Size {
+		zeroBytes(plain)
+		return nil, ErrInvalidPassword
+	}
+	return plain, nil
 }
 
 func unlockAEAD(encrypted EncryptedVault, password string) (cipher.AEAD, []byte, error) {
-	if password == "" || encrypted.Version != currentVaultVersion {
+	if password == "" || (encrypted.Version != currentVaultVersion && encrypted.Version != legacyVaultVersion) {
 		return nil, nil, ErrInvalidPassword
 	}
 	params := normalizeKDFParams(encrypted.KDF)
@@ -217,12 +262,38 @@ func normalizeDocumentMetadata(metadata DocumentMetadata, contentLength int) Doc
 	return metadata
 }
 
-func manifestAAD() []byte {
-	return []byte("cryptowitch:manifest:v2")
+func encryptDocumentChunks(aead cipher.AEAD, id string, content []byte, chunkSize int) ([]EncryptedPayload, error) {
+	count := chunkCount(len(content), chunkSize)
+	chunks := make([]EncryptedPayload, 0, count)
+	for index := 0; index < count; index++ {
+		start := index * chunkSize
+		end := min(start+chunkSize, len(content))
+		chunk, err := encryptPayload(aead, content[start:end], documentChunkAAD(currentVaultVersion, id, index))
+		if err != nil {
+			return nil, err
+		}
+		chunks = append(chunks, chunk)
+	}
+	return chunks, nil
 }
 
-func documentAAD(id string) []byte {
-	return []byte("cryptowitch:document:v2:" + base64.RawURLEncoding.EncodeToString([]byte(id)))
+func chunkCount(contentLength int, chunkSize int) int {
+	if contentLength == 0 {
+		return 0
+	}
+	return (contentLength + chunkSize - 1) / chunkSize
+}
+
+func manifestAAD(version int) []byte {
+	return []byte(fmt.Sprintf("cryptowitch:manifest:v%d", version))
+}
+
+func documentAAD(version int, id string) []byte {
+	return []byte(fmt.Sprintf("cryptowitch:document:v%d:%s", version, base64.RawURLEncoding.EncodeToString([]byte(id))))
+}
+
+func documentChunkAAD(version int, id string, index int) []byte {
+	return []byte(fmt.Sprintf("cryptowitch:document:v%d:%s:chunk:%d", version, base64.RawURLEncoding.EncodeToString([]byte(id)), index))
 }
 
 func deriveKey(password string, salt []byte, params KDFParams) []byte {

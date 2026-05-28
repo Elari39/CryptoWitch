@@ -1,11 +1,66 @@
-.task
+# Local task/cache state
+.task/
+
+# Environment files
 .env
 .env.*
-bin
-frontend/dist/*
-!frontend/dist/.gitkeep
-frontend/node_modules
-build/linux/appimage/build
-build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+!.env.example
+!.env.*.example
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+tmp/
+temp/
+.tmp/
+
+# Go build/test artifacts
+/cryptowitch
+/cryptowitch.exe
+/CryptoWitch
+/CryptoWitch.exe
+*.test
+coverage.out
+*.coverprofile
+*.prof
 wails_windows_*.syso
-content/plain/*
+
+# Wails build output
+bin/
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/**
+!frontend/dist/.gitkeep
+frontend/.vite/
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+*.tsbuildinfo
+
+# Platform build caches and generated artifacts
+build/linux/appimage/build/
+build/android/app/build/
+build/android/.gradle/
+build/android/app/src/main/jniLibs/*/libwails.so
+build/ios/xcode/
+build/ios/*.a
+build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+
+# Plain source documents are build-time secrets.
+content/plain/**
+!content/plain/.gitkeep
+!content/plain/**/.gitkeep

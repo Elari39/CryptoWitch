@@ -20,6 +20,8 @@ const vault = useVault()
     v-else
     :tree="vault.tree.value"
     :active-document="vault.activeDocument.value"
+    :pdf-load="vault.pdfLoad.value"
+    :pdf-progress="vault.pdfProgress.value"
     :loading="vault.loading.value"
     :document-loading="vault.documentLoading.value"
     :error="vault.error.value"

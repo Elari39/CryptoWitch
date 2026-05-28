@@ -11,6 +11,7 @@ var (
 	ErrLocked           = errors.New("vault is locked")
 	ErrDocumentNotFound = errors.New("document not found")
 	ErrUnsupportedType  = errors.New("unsupported document type")
+	ErrInvalidChunk     = errors.New("invalid pdf chunk")
 )
 
 type Service struct {
@@ -19,6 +20,7 @@ type Service struct {
 	unlocked  bool
 	session   uint64
 	aead      cipher.AEAD
+	version   int
 	documents map[string]DocumentMetadata
 	payloads  map[string]EncryptedDocument
 	htmlCache map[string]string
@@ -51,6 +53,7 @@ func (s *Service) Unlock(password string) (UnlockResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.aead = aead
+	s.version = s.encrypted.Version
 	s.documents = documents
 	s.payloads = payloads
 	s.htmlCache = make(map[string]string)
@@ -71,6 +74,7 @@ func (s *Service) clearUnlockedState() {
 	s.unlocked = false
 	s.session++
 	s.aead = nil
+	s.version = 0
 	s.documents = make(map[string]DocumentMetadata)
 	s.payloads = make(map[string]EncryptedDocument)
 	s.htmlCache = make(map[string]string)
@@ -95,6 +99,7 @@ func (s *Service) GetDocument(id string) (DocumentResponse, error) {
 	document, ok := s.documents[id]
 	payload, hasPayload := s.payloads[id]
 	aead := s.aead
+	version := s.version
 	cachedHTML := s.htmlCache[id]
 	session := s.session
 	s.mu.RUnlock()
@@ -112,7 +117,7 @@ func (s *Service) GetDocument(id string) (DocumentResponse, error) {
 	switch document.DocumentType {
 	case "", "markdown":
 		if cachedHTML == "" {
-			content, err := decryptDocumentPayloadWithAEAD(payload, aead)
+			content, err := decryptDocumentPayloadWithAEAD(version, payload, document, aead)
 			if err != nil {
 				return DocumentResponse{}, ErrInvalidPassword
 			}
@@ -128,13 +133,18 @@ func (s *Service) GetDocument(id string) (DocumentResponse, error) {
 		response.MimeType = "text/markdown; charset=utf-8"
 		response.HTML = cachedHTML
 	case "pdf":
-		content, err := decryptDocumentPayloadWithAEAD(payload, aead)
-		if err != nil {
-			return DocumentResponse{}, ErrInvalidPassword
-		}
 		response.MimeType = "application/pdf"
-		response.ContentBase64 = base64.StdEncoding.EncodeToString(content)
-		zeroBytes(content)
+		response.Chunked = document.Chunked
+		response.ChunkSize = document.ChunkSize
+		response.ChunkCount = document.ChunkCount
+		if !document.Chunked {
+			content, err := decryptDocumentPayloadWithAEAD(version, payload, document, aead)
+			if err != nil {
+				return DocumentResponse{}, ErrInvalidPassword
+			}
+			response.ContentBase64 = base64.StdEncoding.EncodeToString(content)
+			zeroBytes(content)
+		}
 	default:
 		return DocumentResponse{}, ErrUnsupportedType
 	}
@@ -142,6 +152,47 @@ func (s *Service) GetDocument(id string) (DocumentResponse, error) {
 		return DocumentResponse{}, ErrLocked
 	}
 	return response, nil
+}
+
+func (s *Service) GetPDFChunk(id string, index int) (PDFChunkResponse, error) {
+	s.mu.RLock()
+	if !s.unlocked {
+		s.mu.RUnlock()
+		return PDFChunkResponse{}, ErrLocked
+	}
+	document, ok := s.documents[id]
+	payload, hasPayload := s.payloads[id]
+	aead := s.aead
+	version := s.version
+	session := s.session
+	s.mu.RUnlock()
+	if !ok || !hasPayload || aead == nil {
+		return PDFChunkResponse{}, ErrDocumentNotFound
+	}
+	if document.DocumentType != "pdf" || !document.Chunked {
+		return PDFChunkResponse{}, ErrUnsupportedType
+	}
+	if index < 0 || index >= document.ChunkCount || index >= len(payload.Chunks) {
+		return PDFChunkResponse{}, ErrInvalidChunk
+	}
+
+	content, err := decryptDocumentChunkWithAEAD(version, payload, document, index, aead)
+	if err != nil {
+		return PDFChunkResponse{}, ErrInvalidPassword
+	}
+	defer zeroBytes(content)
+
+	if !s.isCurrentSession(session) {
+		return PDFChunkResponse{}, ErrLocked
+	}
+	return PDFChunkResponse{
+		ID:            document.ID,
+		Index:         index,
+		Offset:        int64(index * document.ChunkSize),
+		Size:          len(content),
+		ChunkCount:    document.ChunkCount,
+		ContentBase64: base64.StdEncoding.EncodeToString(content),
+	}, nil
 }
 
 func (s *Service) cacheMarkdownHTML(id string, html string, session uint64) {

@@ -203,10 +203,21 @@ func renderGeneratedVault(encrypted vault.EncryptedVault) ([]byte, error) {
 	for _, document := range encrypted.Documents {
 		buffer.WriteString("\t\t{\n")
 		buffer.WriteString(fmt.Sprintf("\t\t\tID: %q,\n", document.ID))
-		buffer.WriteString("\t\t\tEncryptedPayload: EncryptedPayload{\n")
-		buffer.WriteString(fmt.Sprintf("\t\t\t\tNonce:      %s,\n", byteSliceLiteral(document.Nonce)))
-		buffer.WriteString(fmt.Sprintf("\t\t\t\tCiphertext: %s,\n", chunkedByteSliceLiteral(document.Ciphertext)))
-		buffer.WriteString("\t\t\t},\n")
+		if len(document.Chunks) > 0 {
+			buffer.WriteString("\t\t\tChunks: []EncryptedPayload{\n")
+			for _, chunk := range document.Chunks {
+				buffer.WriteString("\t\t\t\t{\n")
+				buffer.WriteString(fmt.Sprintf("\t\t\t\t\tNonce:      %s,\n", byteSliceLiteral(chunk.Nonce)))
+				buffer.WriteString(fmt.Sprintf("\t\t\t\t\tCiphertext: %s,\n", chunkedByteSliceLiteral(chunk.Ciphertext)))
+				buffer.WriteString("\t\t\t\t},\n")
+			}
+			buffer.WriteString("\t\t\t},\n")
+		} else {
+			buffer.WriteString("\t\t\tEncryptedPayload: EncryptedPayload{\n")
+			buffer.WriteString(fmt.Sprintf("\t\t\t\tNonce:      %s,\n", byteSliceLiteral(document.Nonce)))
+			buffer.WriteString(fmt.Sprintf("\t\t\t\tCiphertext: %s,\n", chunkedByteSliceLiteral(document.Ciphertext)))
+			buffer.WriteString("\t\t\t},\n")
+		}
 		buffer.WriteString("\t\t},\n")
 	}
 	buffer.WriteString("\t},\n")

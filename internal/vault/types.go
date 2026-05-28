@@ -23,6 +23,7 @@ type EncryptedPayload struct {
 type EncryptedDocument struct {
 	ID string `json:"id"`
 	EncryptedPayload
+	Chunks []EncryptedPayload `json:"chunks,omitempty"`
 }
 
 type DocumentMetadata struct {
@@ -32,6 +33,9 @@ type DocumentMetadata struct {
 	DocumentType string `json:"documentType"`
 	MimeType     string `json:"mimeType,omitempty"`
 	Size         int64  `json:"size"`
+	Chunked      bool   `json:"chunked,omitempty"`
+	ChunkSize    int    `json:"chunkSize,omitempty"`
+	ChunkCount   int    `json:"chunkCount,omitempty"`
 }
 
 type DocumentManifest struct {
@@ -66,6 +70,18 @@ type DocumentResponse struct {
 	Size          int64  `json:"size"`
 	HTML          string `json:"html,omitempty"`
 	ContentBase64 string `json:"contentBase64,omitempty"`
+	Chunked       bool   `json:"chunked,omitempty"`
+	ChunkSize     int    `json:"chunkSize,omitempty"`
+	ChunkCount    int    `json:"chunkCount,omitempty"`
+}
+
+type PDFChunkResponse struct {
+	ID            string `json:"id"`
+	Index         int    `json:"index"`
+	Offset        int64  `json:"offset"`
+	Size          int    `json:"size"`
+	ChunkCount    int    `json:"chunkCount"`
+	ContentBase64 string `json:"contentBase64"`
 }
 
 type UnlockResponse struct {

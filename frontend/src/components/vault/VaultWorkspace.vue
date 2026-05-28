@@ -2,11 +2,13 @@
 import { computed } from 'vue'
 import DocumentTree from './DocumentTree.vue'
 import DocumentViewer from './DocumentViewer.vue'
-import type { ReadonlyVaultDocument, ReadonlyVaultTreeNode } from '../../types/vault'
+import type { PDFLoadState, ReadonlyVaultDocument, ReadonlyVaultTreeNode } from '../../types/vault'
 
 interface Props {
   tree: readonly ReadonlyVaultTreeNode[]
   activeDocument: ReadonlyVaultDocument | null
+  pdfLoad: PDFLoadState
+  pdfProgress: number
   loading: boolean
   documentLoading: boolean
   error: string
@@ -40,7 +42,12 @@ const activeId = computed(() => props.activeDocument?.id)
 
     <section class="content">
       <div v-if="error" class="content-error" role="alert">{{ error }}</div>
-      <DocumentViewer :document="activeDocument" :loading="documentLoading" />
+      <DocumentViewer
+        :document="activeDocument"
+        :loading="documentLoading"
+        :pdf-load="pdfLoad"
+        :pdf-progress="pdfProgress"
+      />
     </section>
   </main>
 </template>
