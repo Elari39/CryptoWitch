@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/yuin/goldmark"
+	highlighting "github.com/yuin/goldmark-highlighting/v2"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 )
@@ -12,6 +13,9 @@ import (
 var markdownRenderer = goldmark.New(
 	goldmark.WithExtensions(
 		extension.GFM,
+		highlighting.NewHighlighting(
+			highlighting.WithStyle("dracula"),
+		),
 	),
 	goldmark.WithParserOptions(
 		parser.WithAutoHeadingID(),

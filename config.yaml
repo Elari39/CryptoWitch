@@ -1,7 +1,7 @@
 app:
   title: CryptoWitch
 vault:
-  password: "change-me-before-release"
+  password: "Elaina"
   kdf:
     time: 3
     memory: 65536

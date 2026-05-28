@@ -104,3 +104,32 @@ func TestRenderMarkdownDoesNotAllowRawHTML(t *testing.T) {
 		t.Fatalf("RenderMarkdown() did not render safe markdown: %s", html)
 	}
 }
+
+func TestRenderMarkdownHighlightsFencedCode(t *testing.T) {
+	html, err := RenderMarkdown("```go\nfmt.Println(\"hi\")\n```")
+	if err != nil {
+		t.Fatalf("RenderMarkdown() error = %v", err)
+	}
+	if !strings.Contains(html, "<pre") || !strings.Contains(html, "<code") {
+		t.Fatalf("RenderMarkdown() did not render a code block: %s", html)
+	}
+	if !strings.Contains(html, "<span style=") || !strings.Contains(html, "color:") {
+		t.Fatalf("RenderMarkdown() did not add syntax highlighting markup: %s", html)
+	}
+	if !strings.Contains(html, "fmt") || !strings.Contains(html, "Println") {
+		t.Fatalf("RenderMarkdown() dropped code contents: %s", html)
+	}
+}
+
+func TestRenderMarkdownKeepsUnknownLanguageCode(t *testing.T) {
+	html, err := RenderMarkdown("```not-a-real-language\n<token>\n```")
+	if err != nil {
+		t.Fatalf("RenderMarkdown() error = %v", err)
+	}
+	if !strings.Contains(html, "<pre") || !strings.Contains(html, "<code") {
+		t.Fatalf("RenderMarkdown() did not render a code block: %s", html)
+	}
+	if !strings.Contains(html, "&lt;token&gt;") {
+		t.Fatalf("RenderMarkdown() did not preserve escaped code contents: %s", html)
+	}
+}

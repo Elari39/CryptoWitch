@@ -49,12 +49,17 @@ const activeId = computed(() => props.activeDocument?.id)
 .workspace {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
   background: #0e1218;
 }
 
 .sidebar {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
+  min-height: 0;
   border-right: 1px solid #253042;
   background: #151b24;
 }
@@ -102,7 +107,8 @@ const activeId = computed(() => props.activeDocument?.id)
 .content {
   position: relative;
   min-width: 0;
-  min-height: 100vh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .content-error {

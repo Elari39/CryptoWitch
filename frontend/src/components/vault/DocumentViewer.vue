@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nextTick, shallowRef, watch } from 'vue'
 import type { VaultDocument } from '../../types/vault'
 
 interface Props {
@@ -6,11 +7,23 @@ interface Props {
   loading: boolean
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
+const viewerRef = shallowRef<HTMLElement | null>(null)
+
+watch(
+  () => props.document?.id,
+  async (documentId) => {
+    if (!documentId) {
+      return
+    }
+    await nextTick()
+    viewerRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
+  },
+)
 </script>
 
 <template>
-  <section class="viewer" aria-live="polite">
+  <section ref="viewerRef" class="viewer" aria-live="polite">
     <div v-if="loading" class="viewer-state">正在加载文档...</div>
     <article v-else-if="document" class="markdown-view">
       <header class="document-header">
@@ -31,9 +44,31 @@ defineProps<Props>()
   min-width: 0;
   height: 100%;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
   background: #f8f6f1;
   color: #17202b;
   user-select: none;
+  scrollbar-color: #c8bca9 #f1ece3;
+  scrollbar-width: thin;
+}
+
+.viewer::-webkit-scrollbar {
+  width: 12px;
+}
+
+.viewer::-webkit-scrollbar-track {
+  background: #f1ece3;
+}
+
+.viewer::-webkit-scrollbar-thumb {
+  border: 3px solid #f1ece3;
+  border-radius: 999px;
+  background: #c8bca9;
+}
+
+.viewer::-webkit-scrollbar-thumb:hover {
+  background: #ac9d86;
 }
 
 .viewer-state {
@@ -111,20 +146,59 @@ defineProps<Props>()
   padding: 2px 5px;
   background: #ebe4d8;
   color: #7c3e14;
+  font-family: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.92em;
 }
 
 .markdown-body :deep(pre) {
+  position: relative;
   overflow: auto;
+  margin: 24px 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  padding: 16px;
-  background: #17202b;
+  padding: 46px 20px 20px;
+  background: #10151f;
   color: #edf2f7;
+  box-shadow: 0 18px 48px rgba(16, 21, 31, 0.22);
+  scrollbar-color: #586476 #10151f;
+  scrollbar-width: thin;
+}
+
+.markdown-body :deep(pre::before) {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #ff5f57;
+  box-shadow:
+    20px 0 0 #ffbd2e,
+    40px 0 0 #28c840;
+  content: "";
+}
+
+.markdown-body :deep(pre::-webkit-scrollbar) {
+  height: 12px;
+}
+
+.markdown-body :deep(pre::-webkit-scrollbar-track) {
+  background: #10151f;
+}
+
+.markdown-body :deep(pre::-webkit-scrollbar-thumb) {
+  border: 3px solid #10151f;
+  border-radius: 999px;
+  background: #586476;
 }
 
 .markdown-body :deep(pre code) {
   padding: 0;
   background: transparent;
   color: inherit;
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre;
 }
 
 @media (max-width: 760px) {
