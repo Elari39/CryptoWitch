@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@wailsio/runtime": "latest",
+    "katex": "^0.17.0",
     "vue": "^3.2.45"
   },
   "devDependencies": {

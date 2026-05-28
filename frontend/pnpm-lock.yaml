@@ -11,6 +11,9 @@ importers:
       '@wailsio/runtime':
         specifier: latest
         version: 3.0.0-alpha.79
+      katex:
+        specifier: ^0.17.0
+        version: 0.17.0
       vue:
         specifier: ^3.2.45
         version: 3.5.35(typescript@4.9.5)
@@ -231,6 +234,10 @@ packages:
   brace-expansion@2.1.1:
     resolution: {integrity: sha512-WR1cURNjuvBLMZBMbqM0UoE+WAfdUcEV1ccD8PVBVOI+Z3ND4+SZbN8RsfT2bMuG1qwz5RFvPukSZm5fF2D5eA==}
 
+  commander@8.3.0:
+    resolution: {integrity: sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww==}
+    engines: {node: '>= 12'}
+
   computeds@0.0.1:
     resolution: {integrity: sha512-7CEBgcMjVmitjYo5q8JTJVra6X5mQ20uTThdK+0kR7UEaDrAWEQcRiBtWJzga4eRpP6afNwwLsX2SET2JhVB1Q==}
 
@@ -267,6 +274,10 @@ packages:
 
   he@1.2.0:
     resolution: {integrity: sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==}
+    hasBin: true
+
+  katex@0.17.0:
+    resolution: {integrity: sha512-Vdw0ATsQ9V+LuegM/BTwQqV/6cTl5lbGcIrU+BCgLxyf6bo38ybOr372tuSIxir3CN720flu1meYR6XzNMwQnw==}
     hasBin: true
 
   lightningcss-android-arm64@1.32.0:
@@ -651,6 +662,8 @@ snapshots:
     dependencies:
       balanced-match: 1.0.2
 
+  commander@8.3.0: {}
+
   computeds@0.0.1: {}
 
   csstype@3.2.3: {}
@@ -671,6 +684,10 @@ snapshots:
     optional: true
 
   he@1.2.0: {}
+
+  katex@0.17.0:
+    dependencies:
+      commander: 8.3.0
 
   lightningcss-android-arm64@1.32.0:
     optional: true

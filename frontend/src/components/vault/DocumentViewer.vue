@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, shallowRef, watch } from 'vue'
+import renderMathInElement from 'katex/contrib/auto-render'
 import type { PDFLoadState, VaultDocument } from '../../types/vault'
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
 
 const props = defineProps<Props>()
 const viewerRef = shallowRef<HTMLElement | null>(null)
+const markdownBodyRef = shallowRef<HTMLElement | null>(null)
 const pdfLoaded = shallowRef(false)
 const fileSizeLabel = computed(() => formatSize(props.document?.size))
 const pdfLoadingLabel = computed(() => {
@@ -33,6 +35,24 @@ function formatSize(size?: number) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
+function renderMarkdownMath() {
+  const markdownBody = markdownBodyRef.value
+  if (!markdownBody || props.document?.documentType !== 'markdown') {
+    return
+  }
+
+  renderMathInElement(markdownBody, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '\\(', right: '\\)', display: false },
+      { left: '$', right: '$', display: false },
+    ],
+    ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'option'],
+    throwOnError: false,
+  })
+}
+
 watch(
   () => props.document?.id,
   async (documentId) => {
@@ -48,6 +68,15 @@ watch(
   () => props.document,
   () => {
     pdfLoaded.value = false
+  },
+  { immediate: true },
+)
+
+watch(
+  () => [props.document?.id, props.document?.html] as const,
+  async () => {
+    await nextTick()
+    renderMarkdownMath()
   },
   { immediate: true },
 )
@@ -84,7 +113,7 @@ watch(
         <h1 class="document-title">{{ document.title }}</h1>
         <p class="document-size markdown-size">{{ fileSizeLabel }}</p>
       </header>
-      <div class="markdown-body" v-html="document.html"></div>
+      <div ref="markdownBodyRef" class="markdown-body" v-html="document.html"></div>
     </article>
     <div v-else class="viewer-state">
       <p class="state-title">请选择一篇文档或 PDF</p>
@@ -243,6 +272,21 @@ watch(
 .markdown-body {
   font-size: 16px;
   line-height: 1.75;
+}
+
+.markdown-body :deep(.katex) {
+  font-size: 1.05em;
+}
+
+.markdown-body :deep(.katex-display) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 20px 0;
+  padding: 4px 2px;
+}
+
+.markdown-body :deep(.katex-display > .katex) {
+  white-space: nowrap;
 }
 
 .markdown-body :deep(h1),
