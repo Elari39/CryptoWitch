@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, shallowRef, watch } from 'vue'
+import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import renderMathInElement from 'katex/contrib/auto-render'
 import type { PDFLoadState, VaultDocument } from '../../types/vault'
 
@@ -15,6 +15,8 @@ const viewerRef = shallowRef<HTMLElement | null>(null)
 const markdownBodyRef = shallowRef<HTMLElement | null>(null)
 const pdfLoaded = shallowRef(false)
 const fileSizeLabel = computed(() => formatSize(props.document?.size))
+// 正文首个一级标题：命中则从正文中移除，避免与顶部标题重复；未命中则为空，回退到文件名。
+const firstHeading = ref('')
 const pdfLoadingLabel = computed(() => {
   if (props.pdfLoad.totalChunks > 1) {
     return `正在加载 PDF ${props.pdfProgress}%（${props.pdfLoad.loadedChunks}/${props.pdfLoad.totalChunks}）`
@@ -53,6 +55,67 @@ function renderMarkdownMath() {
   })
 }
 
+// 独立行图片（goldmark 输出 <p><img></p>）提升为居中 figure + alt 图注；
+// 内联图片保持原位。外链图片加载失败时替换为占位提示，避免碎图标。
+function enhanceImages() {
+  const markdownBody = markdownBodyRef.value
+  if (!markdownBody || props.document?.documentType !== 'markdown') {
+    return
+  }
+  const images = markdownBody.querySelectorAll('img')
+  images.forEach((img) => {
+    if (img.dataset.enhanced === '1') return
+    img.dataset.enhanced = '1'
+    img.loading = 'lazy'
+    img.decoding = 'async'
+    img.referrerPolicy = 'no-referrer'
+
+    const alt = (img.getAttribute('alt') || '').trim()
+    const parent = img.parentElement
+    const standalone = parent?.tagName === 'P' && parent.childNodes.length === 1
+
+    if (standalone) {
+      const figure = document.createElement('figure')
+      figure.className = 'md-figure'
+      parent.replaceWith(figure)
+      figure.appendChild(img)
+      if (alt) {
+        const caption = document.createElement('figcaption')
+        caption.className = 'md-figure-caption'
+        caption.textContent = alt
+        figure.appendChild(caption)
+      }
+    }
+
+    img.addEventListener('error', () => {
+      const holder = document.createElement('span')
+      holder.className = 'md-img-broken'
+      holder.textContent = `图片无法加载：${img.getAttribute('src') || ''}`
+      img.replaceWith(holder)
+    })
+  })
+}
+
+// 取正文第一个一级标题作为顶部标题，并将其从正文中移除，避免与顶部重复。
+// 代码块内的 '#' 会被 goldmark 渲染为 <code> 文本而非 <h1>，因此天然只命中真正的 Markdown H1。
+function extractFirstHeading() {
+  const markdownBody = markdownBodyRef.value
+  if (!markdownBody || props.document?.documentType !== 'markdown') {
+    firstHeading.value = ''
+    return
+  }
+  const heading = markdownBody.querySelector('h1')
+  if (heading) {
+    firstHeading.value = (heading.textContent || '').trim()
+    heading.remove()
+  } else {
+    firstHeading.value = ''
+  }
+}
+
+// 顶部标题：优先取正文首个 H1，无则回退到文件名（document.title）。
+const headerTitle = computed(() => firstHeading.value || props.document?.title || '')
+
 watch(
   () => props.document?.id,
   async (documentId) => {
@@ -77,6 +140,8 @@ watch(
   async () => {
     await nextTick()
     renderMarkdownMath()
+    enhanceImages()
+    extractFirstHeading()
   },
   { immediate: true },
 )
@@ -110,7 +175,7 @@ watch(
     <article v-else-if="document" class="markdown-view">
       <header class="document-header">
         <p class="document-kicker">Markdown</p>
-        <h1 class="document-title">{{ document.title }}</h1>
+        <h1 class="document-title">{{ headerTitle }}</h1>
         <p class="document-size markdown-size">{{ fileSizeLabel }}</p>
       </header>
       <div ref="markdownBodyRef" class="markdown-body" v-html="document.html"></div>
@@ -397,8 +462,41 @@ watch(
 .markdown-body :deep(img) {
   max-width: 100%;
   height: auto;
-  border: 1px solid var(--rule);
   border-radius: 6px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.markdown-body :deep(.md-figure) {
+  margin: 24px 0;
+  text-align: center;
+}
+
+.markdown-body :deep(.md-figure img) {
+  display: inline-block;
+}
+
+.markdown-body :deep(.md-figure-caption) {
+  margin: 10px 0 0;
+  color: var(--ink-faint);
+  font-size: 13px;
+  font-style: italic;
+  font-family: var(--font-ui);
+}
+
+.markdown-body :deep(.md-img-broken) {
+  display: block;
+  margin: 24px auto;
+  padding: 14px 18px;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 1px dashed var(--rule-strong);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--ink-faint);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  word-break: break-all;
 }
 
 .markdown-body :deep(table) {

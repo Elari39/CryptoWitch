@@ -9,16 +9,16 @@ import (
 	"cryptowitch/internal/vault"
 )
 
-func TestRunRequiresPasswordEnvironment(t *testing.T) {
-	t.Setenv(vaultPasswordEnv, "")
+func TestRunRequiresAccessPassword(t *testing.T) {
 	root := t.TempDir()
 	configPath := writeTestFile(t, root, "config.yaml", "app:\n  title: CryptoWitch\nvault:\n  kdf:\n    time: 1\n")
+	accessPath := writeTestFile(t, root, "access.yaml", "password: \"\"\nallowedMACs:\n  - \"*\"\n")
 	contentDir := filepath.Join(root, "content")
 	writeTestFile(t, contentDir, "intro.md", "# Intro\n")
 
-	err := run(configPath, contentDir, filepath.Join(root, "generated.go"))
-	if err == nil || !strings.Contains(err.Error(), vaultPasswordEnv) {
-		t.Fatalf("run() error = %v, want missing %s", err, vaultPasswordEnv)
+	err := run(configPath, accessPath, contentDir, filepath.Join(root, "generated.go"))
+	if err == nil || !strings.Contains(err.Error(), "password") {
+		t.Fatalf("run() error = %v, want missing password", err)
 	}
 }
 
@@ -40,7 +40,7 @@ func TestReadDocumentsSupportsMarkdownPDFAndSkipsOtherFiles(t *testing.T) {
 	if markdown.DocumentType != "markdown" || markdown.MimeType != "text/markdown; charset=utf-8" {
 		t.Fatalf("markdown metadata = %#v", markdown)
 	}
-	if markdown.Title != "Intro" || string(markdown.Content) != "# Intro\n\nHello" || markdown.Size != int64(len("# Intro\n\nHello")) {
+	if markdown.Title != "intro" || string(markdown.Content) != "# Intro\n\nHello" || markdown.Size != int64(len("# Intro\n\nHello")) {
 		t.Fatalf("markdown document = %#v", markdown)
 	}
 
@@ -67,13 +67,13 @@ func TestReadDocumentsReturnsEmptyForUnsupportedOnly(t *testing.T) {
 }
 
 func TestRunErrorsWhenNoSupportedDocumentsFound(t *testing.T) {
-	t.Setenv(vaultPasswordEnv, "test-password")
 	root := t.TempDir()
 	configPath := writeTestFile(t, root, "config.yaml", "app:\n  title: CryptoWitch\nvault:\n  kdf:\n    time: 1\n")
+	accessPath := writeTestFile(t, root, "access.yaml", "password: \"test-password\"\nallowedMACs:\n  - \"*\"\n")
 	contentDir := filepath.Join(root, "content")
 	writeTestFile(t, contentDir, "notes.txt", "skip")
 
-	err := run(configPath, contentDir, filepath.Join(root, "generated.go"))
+	err := run(configPath, accessPath, contentDir, filepath.Join(root, "generated.go"))
 	if err == nil || !strings.Contains(err.Error(), "no supported documents found") {
 		t.Fatalf("run() error = %v, want no supported documents found", err)
 	}
@@ -97,6 +97,7 @@ func TestRenderGeneratedVaultIncludesPDFChunks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncryptVault() error = %v", err)
 	}
+	encrypted.AllowedMACs = []string{"AA:BB:CC:DD:EE:FF", "*"}
 	generated, err := renderGeneratedVault(encrypted)
 	if err != nil {
 		t.Fatalf("renderGeneratedVault() error = %v", err)
@@ -107,6 +108,9 @@ func TestRenderGeneratedVaultIncludesPDFChunks(t *testing.T) {
 	}
 	if !strings.Contains(source, "Chunks: []EncryptedPayload") {
 		t.Fatalf("generated source missing PDF chunks: %s", source)
+	}
+	if !strings.Contains(source, "AllowedMACs: []string{") || !strings.Contains(source, `"*"`) {
+		t.Fatalf("generated source missing AllowedMACs: %s", source)
 	}
 }
 

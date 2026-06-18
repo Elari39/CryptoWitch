@@ -1,0 +1,91 @@
+"filename", "language", "JSON", "PowerShell", "YAML", "Markdown", "Batch", "Go", "Go Checksum File", "JSON with Comments", "Go Module File", "TypeScript", "XML", "Shell Script", "vue", "Objective-C", "HTML", "PostCSS", "Java Properties", "Gradle", "Java", "comment", "blank", "total"
+"f:\WorkSpace\Go\Test\CryptoWitch\.claude\settings.local.json", "JSON", 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 17
+"f:\WorkSpace\Go\Test\CryptoWitch\README.md", "Markdown", 0, 0, 0, 244, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 96, 340
+"f:\WorkSpace\Go\Test\CryptoWitch\Taskfile.yml", "YAML", 0, 0, 51, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 63
+"f:\WorkSpace\Go\Test\CryptoWitch\access.example.yaml", "YAML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 8
+"f:\WorkSpace\Go\Test\CryptoWitch\build-exe.cmd", "Batch", 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 17
+"f:\WorkSpace\Go\Test\CryptoWitch\build\Taskfile.yml", "YAML", 0, 0, 318, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 31, 356
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\Taskfile.yml", "YAML", 0, 0, 204, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 29, 238
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\app\build.gradle", "Gradle", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 0, 6, 10, 64
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\app\src\main\AndroidManifest.xml", "XML", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 31
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\app\src\main\java\com\wails\app\MainActivity.java", "Java", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 146, 25, 28, 199
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\app\src\main\java\com\wails\app\WailsBridge.java", "Java", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 133, 56, 26, 215
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\app\src\main\java\com\wails\app\WailsJSBridge.java", "Java", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 84, 45, 14, 143
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\app\src\main\java\com\wails\app\WailsPathHandler.java", "Java", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 90, 12, 17, 119
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\app\src\main\res\layout\activity_main.xml", "XML", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 13
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\app\src\main\res\values\colors.xml", "XML", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 9
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\app\src\main\res\values\strings.xml", "XML", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\app\src\main\res\values\themes.xml", "XML", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 3, 1, 15
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\build.gradle", "Gradle", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 1, 1, 5
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\gradle.properties", "Java Properties", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 18, 6, 27
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\gradle\wrapper\gradle-wrapper.properties", "Java Properties", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 1, 8
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\gradlew.bat", "Batch", 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 22, 94
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\main_android.go", "Go", 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 4, 12
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\scripts\deps\install_deps.go", "Go", 0, 0, 0, 0, 0, 126, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 17, 152
+"f:\WorkSpace\Go\Test\CryptoWitch\build\android\settings.gradle", "Gradle", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 3, 19
+"f:\WorkSpace\Go\Test\CryptoWitch\build\appicon.icon\Assets\wails_icon_vector.svg", "XML", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 10
+"f:\WorkSpace\Go\Test\CryptoWitch\build\appicon.icon\icon.json", "JSON", 51, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 51
+"f:\WorkSpace\Go\Test\CryptoWitch\build\config.yml", "YAML", 0, 0, 39, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 6, 80
+"f:\WorkSpace\Go\Test\CryptoWitch\build\darwin\Taskfile.yml", "YAML", 0, 0, 179, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 20, 206
+"f:\WorkSpace\Go\Test\CryptoWitch\build\ios\LaunchScreen.storyboard", "XML", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 53
+"f:\WorkSpace\Go\Test\CryptoWitch\build\ios\Taskfile.yml", "YAML", 0, 0, 263, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 18, 293
+"f:\WorkSpace\Go\Test\CryptoWitch\build\ios\app_options_default.go", "Go", 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 10
+"f:\WorkSpace\Go\Test\CryptoWitch\build\ios\app_options_ios.go", "Go", 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 11
+"f:\WorkSpace\Go\Test\CryptoWitch\build\ios\build.sh", "Shell Script", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 49, 0, 0, 0, 0, 0, 0, 0, 11, 12, 72
+"f:\WorkSpace\Go\Test\CryptoWitch\build\ios\main.m", "Objective-C", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 6, 4, 23
+"f:\WorkSpace\Go\Test\CryptoWitch\build\ios\main_default.go", "Go", 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 6
+"f:\WorkSpace\Go\Test\CryptoWitch\build\ios\main_ios.go", "Go", 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 5, 24
+"f:\WorkSpace\Go\Test\CryptoWitch\build\ios\scripts\deps\install_deps.go", "Go", 0, 0, 0, 0, 0, 270, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 22, 319
+"f:\WorkSpace\Go\Test\CryptoWitch\build\linux\Taskfile.yml", "YAML", 0, 0, 191, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 20, 225
+"f:\WorkSpace\Go\Test\CryptoWitch\build\linux\appimage\build.sh", "Shell Script", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 11, 9, 36
+"f:\WorkSpace\Go\Test\CryptoWitch\build\linux\nfpm\nfpm.yaml", "YAML", 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 8, 81
+"f:\WorkSpace\Go\Test\CryptoWitch\build\linux\nfpm\scripts\postinstall.sh", "Shell Script", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 5, 4, 22
+"f:\WorkSpace\Go\Test\CryptoWitch\build\linux\nfpm\scripts\postremove.sh", "Shell Script", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2
+"f:\WorkSpace\Go\Test\CryptoWitch\build\linux\nfpm\scripts\preinstall.sh", "Shell Script", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2
+"f:\WorkSpace\Go\Test\CryptoWitch\build\linux\nfpm\scripts\preremove.sh", "Shell Script", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2
+"f:\WorkSpace\Go\Test\CryptoWitch\build\windows\Taskfile.yml", "YAML", 0, 0, 171, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 15, 198
+"f:\WorkSpace\Go\Test\CryptoWitch\build\windows\info.json", "JSON", 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 16
+"f:\WorkSpace\Go\Test\CryptoWitch\build\windows\msix\app_manifest.xml", "XML", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 56
+"f:\WorkSpace\Go\Test\CryptoWitch\build\windows\msix\template.xml", "XML", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 55
+"f:\WorkSpace\Go\Test\CryptoWitch\cmd\packdocs\main.go", "Go", 0, 0, 0, 0, 0, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22, 287
+"f:\WorkSpace\Go\Test\CryptoWitch\cmd\packdocs\main_test.go", "Go", 0, 0, 0, 0, 0, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 128
+"f:\WorkSpace\Go\Test\CryptoWitch\config.yaml", "YAML", 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 9
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\README.md", "Markdown", 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 19
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\bindings\cryptowitch\internal\vault\index.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 15
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\bindings\cryptowitch\internal\vault\models.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 114, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 19, 154
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\bindings\cryptowitch\internal\vault\service.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 9, 46
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\bindings\github.com\wailsapp\wails\v3\internal\eventcreate.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 3, 10
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\bindings\github.com\wailsapp\wails\v3\internal\eventdata.d.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 3
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\index.html", "HTML", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, 1, 16
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\package.json", "JSON", 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 25
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\pnpm-lock.yaml", "YAML", 0, 0, 655, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 176, 831
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\public\favicon.svg", "XML", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 8
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\public\style.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 69, 0, 0, 0, 6, 15, 90
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\src\App.vue", "vue", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 4, 32
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\src\components\icons\TaijiIcon.vue", "vue", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 3, 25
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\src\components\vault\DocumentTree.vue", "vue", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 293, 0, 0, 0, 0, 0, 0, 0, 37, 330
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\src\components\vault\DocumentViewer.vue", "vue", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 506, 0, 0, 0, 0, 0, 0, 0, 74, 580
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\src\components\vault\UnlockPanel.vue", "vue", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 169, 0, 0, 0, 0, 0, 0, 0, 27, 196
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\src\components\vault\VaultWorkspace.vue", "vue", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 168, 0, 0, 0, 0, 0, 0, 0, 23, 191
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\src\composables\useInteractionGuard.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 38
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\src\composables\useVault.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 194, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17, 211
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\src\main.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 6
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\src\types\katex-auto-render.d.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 20
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\src\types\vault.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 37
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\src\vite-env.d.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\tsconfig.json", "JSON with Comments", 0, 0, 0, 0, 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 20
+"f:\WorkSpace\Go\Test\CryptoWitch\frontend\vite.config.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 14
+"f:\WorkSpace\Go\Test\CryptoWitch\go.mod", "Go Module File", 0, 0, 0, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 56
+"f:\WorkSpace\Go\Test\CryptoWitch\go.sum", "Go Checksum File", 0, 0, 0, 0, 0, 0, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 171
+"f:\WorkSpace\Go\Test\CryptoWitch\internal\vault\crypto.go", "Go", 0, 0, 0, 0, 0, 290, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 325
+"f:\WorkSpace\Go\Test\CryptoWitch\internal\vault\device.go", "Go", 0, 0, 0, 0, 0, 53, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 7, 68
+"f:\WorkSpace\Go\Test\CryptoWitch\internal\vault\generated.go", "Go", 0, 0, 0, 0, 0, 5170, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 5173
+"f:\WorkSpace\Go\Test\CryptoWitch\internal\vault\markdown.go", "Go", 0, 0, 0, 0, 0, 27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 32
+"f:\WorkSpace\Go\Test\CryptoWitch\internal\vault\service.go", "Go", 0, 0, 0, 0, 0, 210, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 231
+"f:\WorkSpace\Go\Test\CryptoWitch\internal\vault\service_test.go", "Go", 0, 0, 0, 0, 0, 392, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 429
+"f:\WorkSpace\Go\Test\CryptoWitch\internal\vault\tree.go", "Go", 0, 0, 0, 0, 0, 66, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 76
+"f:\WorkSpace\Go\Test\CryptoWitch\internal\vault\tree_test.go", "Go", 0, 0, 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 49
+"f:\WorkSpace\Go\Test\CryptoWitch\internal\vault\types.go", "Go", 0, 0, 0, 0, 0, 78, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 91
+"f:\WorkSpace\Go\Test\CryptoWitch\main.go", "Go", 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 10, 81
+"f:\WorkSpace\Go\Test\CryptoWitch\scripts\build-exe.ps1", "PowerShell", 0, 86, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 106
+"Total", "-", 106, 86, 2115, 255, 53, 7177, 170, 19, 51, 445, 219, 78, 1186, 13, 15, 69, 10, 67, 453, 504, 1162, 14253

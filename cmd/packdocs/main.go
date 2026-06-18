@@ -17,7 +17,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const vaultPasswordEnv = "CRYPTOWITCH_VAULT_PASSWORD"
+const defaultAccessPath = "access.yaml"
 
 type appConfig struct {
 	App struct {
@@ -33,22 +33,35 @@ type appConfig struct {
 	} `yaml:"vault"`
 }
 
+type accessConfig struct {
+	Password    string   `yaml:"password"`
+	AllowedMACs []string `yaml:"allowedMACs"`
+}
+
 func main() {
 	configPath := flag.String("config", "config.yaml", "build-time app config")
+	accessPath := flag.String("access", defaultAccessPath, "build-time access config (password + MAC whitelist)")
 	contentDir := flag.String("content", "content/plain", "plain markdown content directory")
 	outputPath := flag.String("out", "internal/vault/generated.go", "generated Go vault output")
 	flag.Parse()
 
-	if err := run(*configPath, *contentDir, *outputPath); err != nil {
+	if err := run(*configPath, *accessPath, *contentDir, *outputPath); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(configPath, contentDir, outputPath string) error {
+func run(configPath, accessPath, contentDir, outputPath string) error {
 	config, err := readConfig(configPath)
 	if err != nil {
 		return err
+	}
+	access, err := readAccess(accessPath)
+	if err != nil {
+		return err
+	}
+	if access.Password == "" {
+		return fmt.Errorf("password is required in %s", accessPath)
 	}
 	documents, err := readDocuments(contentDir)
 	if err != nil {
@@ -57,12 +70,8 @@ func run(configPath, contentDir, outputPath string) error {
 	if len(documents) == 0 {
 		return errors.New("no supported documents found")
 	}
-	password := os.Getenv(vaultPasswordEnv)
-	if password == "" {
-		return fmt.Errorf("%s is required", vaultPasswordEnv)
-	}
 
-	encrypted, err := vault.EncryptVault(vault.PlainVault{Documents: documents}, password, vault.KDFParams{
+	encrypted, err := vault.EncryptVault(vault.PlainVault{Documents: documents}, access.Password, vault.KDFParams{
 		Time:    config.Vault.KDF.Time,
 		Memory:  config.Vault.KDF.Memory,
 		Threads: config.Vault.KDF.Threads,
@@ -71,6 +80,7 @@ func run(configPath, contentDir, outputPath string) error {
 	if err != nil {
 		return err
 	}
+	encrypted.AllowedMACs = access.AllowedMACs
 
 	generated, err := renderGeneratedVault(encrypted)
 	if err != nil {
@@ -95,6 +105,18 @@ func readConfig(path string) (appConfig, error) {
 		return appConfig{}, fmt.Errorf("parse config: %w", err)
 	}
 	return config, nil
+}
+
+func readAccess(path string) (accessConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return accessConfig{}, fmt.Errorf("read access config: %w", err)
+	}
+	var access accessConfig
+	if err := yaml.Unmarshal(data, &access); err != nil {
+		return accessConfig{}, fmt.Errorf("parse access config: %w", err)
+	}
+	return access, nil
 }
 
 func readDocuments(root string) ([]vault.PlainDocument, error) {
@@ -156,7 +178,7 @@ func plainDocument(filename string, normalizedPath string, data []byte) vault.Pl
 		return vault.PlainDocument{
 			DocumentMetadata: vault.DocumentMetadata{
 				ID:           documentID(normalizedPath),
-				Title:        documentTitle(filename, string(data)),
+				Title:        strings.TrimSuffix(filename, filepath.Ext(filename)),
 				Path:         normalizedPath,
 				DocumentType: "markdown",
 				MimeType:     "text/markdown; charset=utf-8",
@@ -170,16 +192,6 @@ func plainDocument(filename string, normalizedPath string, data []byte) vault.Pl
 func documentID(path string) string {
 	sum := sha256.Sum256([]byte(path))
 	return base64.RawURLEncoding.EncodeToString(sum[:12])
-}
-
-func documentTitle(filename string, content string) string {
-	for _, line := range strings.Split(content, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "# ") {
-			return strings.TrimSpace(strings.TrimPrefix(trimmed, "# "))
-		}
-	}
-	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
 
 func renderGeneratedVault(encrypted vault.EncryptedVault) ([]byte, error) {
@@ -221,6 +233,14 @@ func renderGeneratedVault(encrypted vault.EncryptedVault) ([]byte, error) {
 		buffer.WriteString("\t\t},\n")
 	}
 	buffer.WriteString("\t},\n")
+	buffer.WriteString("\tAllowedMACs: []string{")
+	for i, mac := range encrypted.AllowedMACs {
+		if i > 0 {
+			buffer.WriteString(", ")
+		}
+		buffer.WriteString(fmt.Sprintf("%q", mac))
+	}
+	buffer.WriteString("},\n")
 	buffer.WriteString("}\n")
 
 	formatted, err := format.Source(buffer.Bytes())

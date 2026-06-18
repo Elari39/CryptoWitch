@@ -33,7 +33,7 @@ function submit() {
       <TaijiIcon class="brand-mark" :size="48" aria-hidden="true" />
       <p class="eyebrow">Encrypted Markdown Vault</p>
       <h1 id="unlock-title" class="title">CryptoWitch</h1>
-      <p class="subtitle">输入密码后才会加载文档目录和内容。</p>
+      <p class="subtitle">输入密码后才会加载文档目录和内容，且需在本机授权设备上使用。</p>
 
       <p class="author-line">
         由

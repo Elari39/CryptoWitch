@@ -7,6 +7,10 @@
 !.env.example
 !.env.*.example
 
+# Build-time access secrets (password + MAC whitelist)
+/access.yaml
+!/access.example.yaml
+
 # OS and editor noise
 .DS_Store
 Thumbs.db

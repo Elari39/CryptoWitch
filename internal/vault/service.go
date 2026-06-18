@@ -8,35 +8,43 @@ import (
 )
 
 var (
-	ErrLocked           = errors.New("vault is locked")
-	ErrDocumentNotFound = errors.New("document not found")
-	ErrUnsupportedType  = errors.New("unsupported document type")
-	ErrInvalidChunk     = errors.New("invalid pdf chunk")
+	ErrLocked              = errors.New("vault is locked")
+	ErrDocumentNotFound    = errors.New("document not found")
+	ErrUnsupportedType     = errors.New("unsupported document type")
+	ErrInvalidChunk        = errors.New("invalid pdf chunk")
+	ErrDeviceNotAuthorized = errors.New("device not authorized")
 )
 
 type Service struct {
-	mu        sync.RWMutex
-	encrypted EncryptedVault
-	unlocked  bool
-	session   uint64
-	aead      cipher.AEAD
-	version   int
-	documents map[string]DocumentMetadata
-	payloads  map[string]EncryptedDocument
-	htmlCache map[string]string
-	tree      []TreeNode
+	mu          sync.RWMutex
+	encrypted   EncryptedVault
+	unlocked    bool
+	session     uint64
+	aead        cipher.AEAD
+	version     int
+	documents   map[string]DocumentMetadata
+	payloads    map[string]EncryptedDocument
+	htmlCache   map[string]string
+	tree        []TreeNode
+	allowedMACs []string
 }
 
 func NewService(encrypted EncryptedVault) *Service {
 	return &Service{
-		encrypted: encrypted,
-		documents: make(map[string]DocumentMetadata),
-		payloads:  make(map[string]EncryptedDocument),
-		htmlCache: make(map[string]string),
+		encrypted:   encrypted,
+		allowedMACs: encrypted.AllowedMACs,
+		documents:   make(map[string]DocumentMetadata),
+		payloads:    make(map[string]EncryptedDocument),
+		htmlCache:   make(map[string]string),
 	}
 }
 
 func (s *Service) Unlock(password string) (UnlockResponse, error) {
+	if err := s.verifyDevice(); err != nil {
+		s.clearUnlockedState()
+		return UnlockResponse{}, err
+	}
+
 	manifest, aead, err := decryptManifestWithPassword(s.encrypted, password)
 	if err != nil {
 		s.clearUnlockedState()

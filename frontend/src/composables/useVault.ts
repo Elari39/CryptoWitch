@@ -134,11 +134,14 @@ export function useVault() {
       tree.value = response.tree
       unlocked.value = true
       activeDocument.value = null
-    } catch {
+    } catch (caught) {
       unlocked.value = false
       tree.value = []
       activeDocument.value = null
-      error.value = '密码不正确，无法解锁文档。'
+      const message = caught instanceof Error ? caught.message : ''
+      error.value = message.includes('device not authorized')
+        ? '本机未授权，无法查看文档。'
+        : '密码不正确，无法解锁文档。'
     } finally {
       loading.value = false
     }

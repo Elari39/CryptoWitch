@@ -8,11 +8,12 @@ type KDFParams struct {
 }
 
 type EncryptedVault struct {
-	Version   int                 `json:"version"`
-	KDF       KDFParams           `json:"kdf"`
-	Salt      []byte              `json:"salt"`
-	Manifest  EncryptedPayload    `json:"manifest"`
-	Documents []EncryptedDocument `json:"documents"`
+	Version     int                 `json:"version"`
+	KDF         KDFParams           `json:"kdf"`
+	Salt        []byte              `json:"salt"`
+	Manifest    EncryptedPayload    `json:"manifest"`
+	Documents   []EncryptedDocument `json:"documents"`
+	AllowedMACs []string            `json:"allowedMacs,omitempty"`
 }
 
 type EncryptedPayload struct {

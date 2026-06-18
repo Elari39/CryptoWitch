@@ -1,0 +1,7 @@
+# 构建期 vault 加密密码；运行时用户需输入相同密码才能解锁。
+password: "change-this-password"
+# 允许查看文档的网卡 MAC 白名单，命中任一即放行。
+# 设为 "*" 时跳过 MAC 校验，仅凭密码即可查看。
+allowedMACs:
+  - "AA:BB:CC:DD:EE:FF"
+  # - "*"

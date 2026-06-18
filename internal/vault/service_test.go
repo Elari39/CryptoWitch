@@ -69,6 +69,60 @@ func TestUnlockWithWrongPassword(t *testing.T) {
 	}
 }
 
+func TestUnlockFailsWhenDeviceNotAuthorized(t *testing.T) {
+	encrypted, err := EncryptVault(PlainVault{
+		Documents: []PlainDocument{
+			{
+				DocumentMetadata: DocumentMetadata{
+					ID:           "intro",
+					Title:        "Intro",
+					Path:         "guide/intro.md",
+					DocumentType: "markdown",
+					MimeType:     "text/markdown; charset=utf-8",
+					Size:         int64(len("# Intro")),
+				},
+				Content: []byte("# Intro"),
+			},
+		},
+	}, "correct-password", KDFParams{Time: 1, Memory: 64 * 1024, Threads: 1, KeyLen: 32})
+	if err != nil {
+		t.Fatalf("EncryptVault() error = %v", err)
+	}
+	encrypted.AllowedMACs = []string{"00:00:00:00:00:99"}
+	service := NewService(encrypted)
+
+	_, err = service.Unlock("correct-password")
+	if !errors.Is(err, ErrDeviceNotAuthorized) {
+		t.Fatalf("Unlock() error = %v, want ErrDeviceNotAuthorized", err)
+	}
+	if service.unlocked {
+		t.Fatal("unlocked = true, want false after device rejection")
+	}
+	if _, err := service.GetTree(); !errors.Is(err, ErrLocked) {
+		t.Fatalf("GetTree() error = %v, want ErrLocked", err)
+	}
+}
+
+func TestUnlockSucceedsWithWildcardMAC(t *testing.T) {
+	service := testService(t)
+	service.allowedMACs = []string{"*"}
+
+	if _, err := service.Unlock("correct-password"); err != nil {
+		t.Fatalf("Unlock() error = %v", err)
+	}
+	if !service.unlocked {
+		t.Fatal("unlocked = false, want true after wildcard unlock")
+	}
+}
+
+func TestUnlockSucceedsWithEmptyMACWhitelist(t *testing.T) {
+	service := testService(t)
+
+	if _, err := service.Unlock("correct-password"); err != nil {
+		t.Fatalf("Unlock() error = %v", err)
+	}
+}
+
 func TestUnlockWithWrongPasswordClearsExistingState(t *testing.T) {
 	service := testService(t)
 

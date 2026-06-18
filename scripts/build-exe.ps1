@@ -42,29 +42,18 @@ function Invoke-Step {
   }
 }
 
-function Set-VaultPasswordForBuild {
-  if ($SkipPackDocs -or -not [string]::IsNullOrWhiteSpace($env:CRYPTOWITCH_VAULT_PASSWORD)) {
-    return $false
-  }
+function Assert-AccessConfig {
+  param([string]$Path)
 
-  $securePassword = Read-Host "Enter CRYPTOWITCH_VAULT_PASSWORD" -AsSecureString
-  if ($securePassword.Length -eq 0) {
-    throw "CRYPTOWITCH_VAULT_PASSWORD is required unless -SkipPackDocs is used."
+  if (Test-Path -LiteralPath $Path) {
+    return
   }
-
-  $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
-  try {
-    $env:CRYPTOWITCH_VAULT_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
-  } finally {
-    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
-  }
-  return $true
+  throw "Access config not found: $Path. Copy access.example.yaml to access.yaml and fill in the password and MAC whitelist."
 }
 
 $repoRoot = Get-RepoRoot
 $artifactPath = Join-Path $repoRoot "bin\CryptoWitch.exe"
-$originalVaultPassword = $env:CRYPTOWITCH_VAULT_PASSWORD
-$scriptSetVaultPassword = $false
+$accessPath = Join-Path $repoRoot "access.yaml"
 
 try {
   Set-Location $repoRoot
@@ -72,9 +61,8 @@ try {
   Require-Command "go"
   Require-Command $PackageManager
 
-  $scriptSetVaultPassword = Set-VaultPasswordForBuild
-
   if (-not $SkipPackDocs) {
+    Assert-AccessConfig $accessPath
     Invoke-Step "Generate encrypted vault" "go" @("run", "./cmd/packdocs")
   } else {
     Write-Host ""
@@ -114,11 +102,4 @@ try {
   Write-Host "Size: $sizeMb MB"
   Write-Host "Updated: $($artifact.LastWriteTime)"
 } finally {
-  if ($scriptSetVaultPassword) {
-    if ([string]::IsNullOrEmpty($originalVaultPassword)) {
-      Remove-Item Env:\CRYPTOWITCH_VAULT_PASSWORD -ErrorAction SilentlyContinue
-    } else {
-      $env:CRYPTOWITCH_VAULT_PASSWORD = $originalVaultPassword
-    }
-  }
 }
