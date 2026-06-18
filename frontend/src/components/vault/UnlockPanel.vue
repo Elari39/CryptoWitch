@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue'
+import TaijiIcon from '../icons/TaijiIcon.vue'
 
 interface Props {
   loading: boolean
@@ -29,10 +30,22 @@ function submit() {
 <template>
   <main class="unlock-shell">
     <section class="unlock-panel" aria-labelledby="unlock-title">
-      <div class="brand-mark" aria-hidden="true">CW</div>
+      <TaijiIcon class="brand-mark" :size="48" aria-hidden="true" />
       <p class="eyebrow">Encrypted Markdown Vault</p>
       <h1 id="unlock-title" class="title">CryptoWitch</h1>
       <p class="subtitle">输入密码后才会加载文档目录和内容。</p>
+
+      <p class="author-line">
+        由
+        <a
+          class="author-link"
+          href="https://github.com/Elari39/CryptoWitch"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Elari39 · GitHub"
+        >Elari39</a>
+        制作
+      </p>
 
       <form class="unlock-form" @submit.prevent="submit">
         <label class="field-label" for="vault-password">访问密码</label>
@@ -62,48 +75,64 @@ function submit() {
   display: grid;
   place-items: center;
   padding: 32px;
-  background: #0e1218;
+  background: linear-gradient(160deg, var(--paper), var(--paper-warm));
 }
 
 .unlock-panel {
   width: min(420px, 100%);
   padding: 32px;
-  border: 1px solid #253042;
+  border: 1px solid var(--rule);
   border-radius: 8px;
-  background: #151b24;
-  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 48px;
   height: 48px;
   margin-bottom: 20px;
   border-radius: 8px;
-  background: #c7a76c;
-  color: #11151c;
-  font-weight: 800;
 }
 
 .eyebrow {
   margin: 0 0 8px;
-  color: #85c7bc;
+  color: var(--accent);
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .title {
   margin: 0;
-  color: #f5f0e8;
+  color: var(--ink-strong);
   font-size: 34px;
   line-height: 1.15;
 }
 
 .subtitle {
-  margin: 12px 0 28px;
-  color: #a8b3c3;
+  margin: 12px 0 12px;
+  color: var(--ink-muted);
+}
+
+.author-line {
+  margin: 0 0 28px;
+  color: var(--ink-faint);
+  font-size: 13px;
+}
+
+.author-link {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px dashed var(--accent);
+  padding-bottom: 1px;
+}
+
+.author-link:hover {
+  color: var(--accent-strong);
+  border-bottom-color: var(--accent-strong);
 }
 
 .unlock-form {
@@ -112,7 +141,7 @@ function submit() {
 }
 
 .field-label {
-  color: #d7deea;
+  color: var(--ink);
   font-size: 14px;
   font-weight: 600;
 }
@@ -121,28 +150,33 @@ function submit() {
   width: 100%;
   height: 44px;
   box-sizing: border-box;
-  border: 1px solid #34445b;
+  border: 1px solid var(--rule-strong);
   border-radius: 6px;
   padding: 0 14px;
   outline: none;
-  background: #0f141b;
-  color: #f4f7fb;
+  background: var(--surface);
+  color: var(--ink);
   font-size: 15px;
 }
 
 .password-input:focus {
-  border-color: #85c7bc;
-  box-shadow: 0 0 0 3px rgba(133, 199, 188, 0.16);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .unlock-button {
   height: 44px;
   border: 0;
   border-radius: 6px;
-  background: #85c7bc;
-  color: #08100f;
+  background: var(--accent);
+  color: var(--surface);
   font-weight: 800;
   cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.unlock-button:hover:not(:disabled) {
+  background: var(--accent-strong);
 }
 
 .unlock-button:disabled {
@@ -152,7 +186,10 @@ function submit() {
 
 .error-message {
   margin: 16px 0 0;
-  color: #ffb0a6;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--accent-wash);
+  color: var(--accent-strong);
   font-size: 14px;
 }
 </style>

@@ -129,10 +129,10 @@ watch(
   overflow: auto;
   overscroll-behavior: contain;
   scroll-behavior: smooth;
-  background: #f8f6f1;
-  color: #17202b;
+  background: var(--paper);
+  color: var(--ink);
   user-select: none;
-  scrollbar-color: #c8bca9 #f1ece3;
+  scrollbar-color: var(--rule-strong) var(--paper);
   scrollbar-width: thin;
 }
 
@@ -141,17 +141,17 @@ watch(
 }
 
 .viewer::-webkit-scrollbar-track {
-  background: #f1ece3;
+  background: var(--paper);
 }
 
 .viewer::-webkit-scrollbar-thumb {
-  border: 3px solid #f1ece3;
+  border: 3px solid var(--paper);
   border-radius: 999px;
-  background: #c8bca9;
+  background: var(--rule-strong);
 }
 
 .viewer::-webkit-scrollbar-thumb:hover {
-  background: #ac9d86;
+  background: var(--ink-faint);
 }
 
 .viewer-state {
@@ -159,13 +159,13 @@ watch(
   place-content: center;
   min-height: 100%;
   padding: 32px;
-  color: #586476;
+  color: var(--ink-muted);
   text-align: center;
 }
 
 .state-title {
   margin: 0 0 8px;
-  color: #1f2937;
+  color: var(--ink-strong);
   font-size: 24px;
   font-weight: 800;
 }
@@ -175,9 +175,10 @@ watch(
 }
 
 .markdown-view {
-  max-width: 860px;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 48px 56px 72px;
+  padding: 56px 48px 80px;
+  font-family: var(--font-serif);
 }
 
 .pdf-view {
@@ -185,7 +186,7 @@ watch(
   grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
   min-height: 0;
-  background: #1b2230;
+  background: var(--paper-warm);
 }
 
 .pdf-header {
@@ -195,16 +196,16 @@ watch(
   gap: 16px;
   margin: 0;
   padding: 18px 24px;
-  border-bottom: 1px solid #313c4f;
-  background: #111722;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
 }
 
 .pdf-header .document-kicker {
-  color: #85c7bc;
+  color: var(--accent);
 }
 
 .pdf-header .document-title {
-  color: #f5f0e8;
+  color: var(--ink-strong);
   font-size: 22px;
 }
 
@@ -218,14 +219,14 @@ watch(
   inset: 0;
   display: grid;
   place-content: center;
-  color: #b8c6d8;
-  background: #1b2230;
+  color: var(--ink-muted);
+  background: var(--paper-warm);
 }
 
 .pdf-progress {
   width: min(320px, 70vw);
   height: 10px;
-  accent-color: #85c7bc;
+  accent-color: var(--accent);
 }
 
 .pdf-frame {
@@ -233,45 +234,56 @@ watch(
   height: 100%;
   min-height: 0;
   border: 0;
-  background: #2a3140;
+  background: var(--surface-2);
 }
 
 .document-header {
   margin-bottom: 28px;
   padding-bottom: 20px;
-  border-bottom: 1px solid #d8d3c8;
+  border-bottom: 1px solid transparent;
+  background-image: linear-gradient(90deg, transparent, var(--rule), transparent);
+  background-position: bottom;
+  background-size: 100% 1px;
+  background-repeat: no-repeat;
 }
 
 .document-kicker {
+  display: inline-block;
   margin: 0 0 8px;
-  color: #b08547;
-  font-size: 12px;
+  padding: 2px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--accent);
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .document-title {
   margin: 0;
-  color: #101820;
+  color: var(--ink-strong);
+  font-family: var(--font-serif);
   font-size: 34px;
   line-height: 1.2;
 }
 
 .document-size {
   margin: 0;
-  color: #9caabd;
+  color: var(--ink-faint);
   font-size: 12px;
   font-weight: 700;
 }
 
 .markdown-size {
   margin-top: 8px;
-  color: #697386;
+  color: var(--ink-muted);
 }
 
 .markdown-body {
-  font-size: 16px;
-  line-height: 1.75;
+  font-size: 17px;
+  line-height: 1.85;
+  color: var(--ink);
 }
 
 .markdown-body :deep(.katex) {
@@ -291,57 +303,151 @@ watch(
 
 .markdown-body :deep(h1),
 .markdown-body :deep(h2),
-.markdown-body :deep(h3) {
+.markdown-body :deep(h3),
+.markdown-body :deep(h4),
+.markdown-body :deep(h5),
+.markdown-body :deep(h6) {
   margin: 28px 0 12px;
-  color: #111827;
-  line-height: 1.25;
+  color: var(--ink-strong);
+  font-family: var(--font-serif);
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.markdown-body :deep(h1) {
+  font-size: 1.7em;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.markdown-body :deep(h2) {
+  font-size: 1.4em;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.markdown-body :deep(h3) {
+  font-size: 1.18em;
+}
+
+.markdown-body :deep(h4) {
+  font-size: 1.04em;
+}
+
+.markdown-body :deep(h5),
+.markdown-body :deep(h6) {
+  font-size: 0.95em;
+  color: var(--ink-muted);
 }
 
 .markdown-body :deep(p) {
-  margin: 0 0 16px;
+  margin: 0 0 18px;
 }
 
 .markdown-body :deep(ul),
 .markdown-body :deep(ol) {
   margin: 0 0 18px;
-  padding-left: 24px;
+  padding-left: 26px;
+}
+
+.markdown-body :deep(li) {
+  margin: 4px 0;
+}
+
+.markdown-body :deep(li::marker) {
+  color: var(--accent);
+}
+
+.markdown-body :deep(a) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-body :deep(a:hover) {
+  color: var(--accent-strong);
+}
+
+.markdown-body :deep(strong) {
+  color: var(--ink-strong);
+  font-weight: 700;
+}
+
+.markdown-body :deep(blockquote) {
+  margin: 20px 0;
+  padding: 12px 18px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  background: var(--accent-wash);
+  color: var(--ink-muted);
+  font-style: italic;
+}
+
+.markdown-body :deep(blockquote p:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-body :deep(hr) {
+  height: 1px;
+  margin: 28px 0;
+  border: 0;
+  background: linear-gradient(90deg, transparent, var(--rule-strong), transparent);
+}
+
+.markdown-body :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+}
+
+.markdown-body :deep(table) {
+  width: 100%;
+  margin: 20px 0;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.markdown-body :deep(th),
+.markdown-body :deep(td) {
+  padding: 8px 12px;
+  border: 1px solid var(--rule);
+  text-align: left;
+}
+
+.markdown-body :deep(th) {
+  background: var(--surface-2);
+  color: var(--ink-strong);
+  font-weight: 700;
+}
+
+.markdown-body :deep(tr:nth-child(even)) {
+  background: var(--accent-wash);
 }
 
 .markdown-body :deep(code) {
   border-radius: 4px;
   padding: 2px 5px;
-  background: #ebe4d8;
-  color: #7c3e14;
-  font-family: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
-  font-size: 0.92em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
 }
 
 .markdown-body :deep(pre) {
   position: relative;
   overflow: auto;
   margin: 24px 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--pre-border);
+  border-top: 2px solid var(--accent);
   border-radius: 8px;
-  padding: 46px 20px 20px;
-  background: #10151f;
-  color: #edf2f7;
-  box-shadow: 0 18px 48px rgba(16, 21, 31, 0.22);
-  scrollbar-color: #586476 #10151f;
+  padding: 20px 22px;
+  /* !important 覆盖 goldmark-highlighting 内联到 <pre> 的深色/浅灰背景，统一为水墨纸色 */
+  background: var(--pre-bg) !important;
+  color: var(--pre-ink);
+  box-shadow: var(--shadow);
+  scrollbar-color: var(--rule) var(--pre-bg);
   scrollbar-width: thin;
-}
-
-.markdown-body :deep(pre::before) {
-  position: absolute;
-  top: 18px;
-  left: 18px;
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: #ff5f57;
-  box-shadow:
-    20px 0 0 #ffbd2e,
-    40px 0 0 #28c840;
-  content: "";
 }
 
 .markdown-body :deep(pre::-webkit-scrollbar) {
@@ -349,19 +455,19 @@ watch(
 }
 
 .markdown-body :deep(pre::-webkit-scrollbar-track) {
-  background: #10151f;
+  background: var(--pre-bg);
 }
 
 .markdown-body :deep(pre::-webkit-scrollbar-thumb) {
-  border: 3px solid #10151f;
+  border: 3px solid var(--pre-bg);
   border-radius: 999px;
-  background: #586476;
+  background: var(--rule-strong);
 }
 
 .markdown-body :deep(pre code) {
   padding: 0;
   background: transparent;
-  color: inherit;
+  color: var(--pre-ink);
   font-size: 14px;
   line-height: 1.7;
   white-space: pre;

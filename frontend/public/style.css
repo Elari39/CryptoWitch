@@ -1,16 +1,53 @@
 :root {
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-  color: #f5f0e8;
-  background: #0e1218;
+  /* 纸张 / 表面 */
+  --paper: #faf7f0;
+  --paper-warm: #f3eee2;
+  --surface: #fffdf8;
+  --surface-2: #f7f2e8;
+
+  /* 墨色文字 */
+  --ink: #2b2722;
+  --ink-strong: #1a1714;
+  --ink-muted: #6c655c;
+  --ink-faint: #9a9286;
+
+  /* 印章红 / Claude 赤陶橙强调 */
+  --accent: #c2603f;
+  --accent-strong: #a84a2c;
+  --accent-soft: rgba(194, 96, 63, 0.1);
+  --accent-wash: rgba(194, 96, 63, 0.06);
+
+  /* 分割线 */
+  --rule: #e6dccb;
+  --rule-strong: #d6cab2;
+
+  /* 代码 */
+  --code-bg: #efe7d4;
+  --code-ink: #8a3f24;
+  --pre-bg: #fbf8f1;
+  --pre-border: #e6dccb;
+  --pre-ink: #3a352e;
+  --pre-comment: #8a8275;
+
+  /* 字体（系统衬线栈，零新增依赖） */
+  --font-ui: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: "Source Han Serif SC", "Noto Serif SC", "Songti SC", "STSong", "SimSun", Georgia, "Times New Roman", serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+
+  --shadow: 0 10px 40px rgba(120, 90, 50, 0.1);
+  --selection: #f2e4cf;
+
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: var(--paper-warm);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--selection);
 }
 
 @font-face {
@@ -37,6 +74,9 @@ body,
 
 body {
   overflow: hidden;
+  background-color: var(--paper-warm);
+  background-image: radial-gradient(rgba(120, 90, 50, 0.025) 1px, transparent 1px);
+  background-size: 22px 22px;
 }
 
 button,

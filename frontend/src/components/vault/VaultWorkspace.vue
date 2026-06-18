@@ -38,6 +38,17 @@ const activeId = computed(() => props.activeDocument?.id)
         </button>
       </div>
       <DocumentTree :nodes="tree" :active-id="activeId" @select="emit('selectDocument', $event)" />
+      <footer class="sidebar-footer">
+        <span class="footer-label">由</span>
+        <a
+          class="footer-author"
+          href="https://github.com/Elari39/CryptoWitch"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Elari39 · GitHub"
+        >Elari39</a>
+        <span class="footer-label">制作</span>
+      </footer>
     </aside>
 
     <section class="content">
@@ -59,16 +70,16 @@ const activeId = computed(() => props.activeDocument?.id)
   height: 100vh;
   min-height: 0;
   overflow: hidden;
-  background: #0e1218;
+  background: var(--paper-warm);
 }
 
 .sidebar {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
-  border-right: 1px solid #253042;
-  background: #151b24;
+  border-right: 1px solid var(--rule);
+  background: var(--paper-warm);
 }
 
 .sidebar-header {
@@ -77,20 +88,21 @@ const activeId = computed(() => props.activeDocument?.id)
   justify-content: space-between;
   gap: 12px;
   padding: 20px;
-  border-bottom: 1px solid #253042;
+  border-bottom: 1px solid var(--rule);
 }
 
 .app-kicker {
   margin: 0 0 4px;
-  color: #85c7bc;
+  color: var(--accent);
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .app-title {
   margin: 0;
-  color: #f5f0e8;
+  color: var(--ink-strong);
   font-size: 22px;
   line-height: 1.2;
 }
@@ -98,12 +110,18 @@ const activeId = computed(() => props.activeDocument?.id)
 .lock-button {
   min-width: 64px;
   height: 34px;
-  border: 1px solid #3a4a62;
+  border: 1px solid var(--rule-strong);
   border-radius: 6px;
-  background: #1e2938;
-  color: #dce5f2;
+  background: var(--surface);
+  color: var(--ink-muted);
   font-weight: 700;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.lock-button:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--ink);
 }
 
 .lock-button:disabled {
@@ -124,12 +142,39 @@ const activeId = computed(() => props.activeDocument?.id)
   top: 16px;
   right: 18px;
   max-width: min(420px, calc(100% - 36px));
-  border: 1px solid #f2a39a;
+  border: 1px solid var(--accent);
   border-radius: 6px;
   padding: 10px 12px;
-  background: #fff4f1;
-  color: #8a2f25;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+  box-shadow: var(--shadow);
+}
+
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--rule);
+  font-size: 12px;
+}
+
+.footer-label {
+  color: var(--ink-faint);
+}
+
+.footer-author {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px dashed var(--accent);
+  padding-bottom: 1px;
+}
+
+.footer-author:hover {
+  color: var(--accent-strong);
+  border-bottom-color: var(--accent-strong);
 }
 
 @media (max-width: 820px) {
@@ -139,7 +184,7 @@ const activeId = computed(() => props.activeDocument?.id)
 
   .sidebar {
     border-right: 0;
-    border-bottom: 1px solid #253042;
+    border-bottom: 1px solid var(--rule);
   }
 }
 </style>

@@ -14,7 +14,7 @@ var markdownRenderer = goldmark.New(
 	goldmark.WithExtensions(
 		extension.GFM,
 		highlighting.NewHighlighting(
-			highlighting.WithStyle("dracula"),
+			highlighting.WithStyle("friendly"),
 		),
 	),
 	goldmark.WithParserOptions(

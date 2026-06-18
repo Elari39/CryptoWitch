@@ -196,22 +196,22 @@ function selectNode(node: ReadonlyVaultTreeNode) {
 .tree-search {
   width: 100%;
   height: 36px;
-  border: 1px solid #2d3b50;
+  border: 1px solid var(--rule-strong);
   border-radius: 6px;
   padding: 0 11px;
   outline: none;
-  background: #101722;
-  color: #edf3fb;
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .tree-search:focus {
-  border-color: #85c7bc;
-  box-shadow: 0 0 0 3px rgba(133, 199, 188, 0.14);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .tree-count {
   margin: 0;
-  color: #8b98aa;
+  color: var(--ink-faint);
   font-size: 12px;
 }
 
@@ -242,21 +242,22 @@ function selectNode(node: ReadonlyVaultTreeNode) {
   border-radius: 6px;
   padding: 8px 10px;
   background: transparent;
-  color: #85c7bc;
+  color: var(--accent);
   font-size: 12px;
   font-weight: 800;
   font-family: inherit;
   text-align: left;
   text-transform: uppercase;
+  letter-spacing: 0.06em;
   cursor: pointer;
 }
 
 .folder-label:hover {
-  background: #1d2836;
+  background: var(--surface-2);
 }
 
 .folder-chevron {
-  color: #8ea0b7;
+  color: var(--ink-faint);
   font-size: 13px;
 }
 
@@ -271,7 +272,7 @@ function selectNode(node: ReadonlyVaultTreeNode) {
   height: auto;
   overflow: visible;
   padding: 0 0 0 10px;
-  border-left: 1px solid #273447;
+  border-left: 1px solid var(--rule);
 }
 
 .tree-document {
@@ -283,10 +284,11 @@ function selectNode(node: ReadonlyVaultTreeNode) {
   border-radius: 6px;
   padding: 8px 10px;
   background: transparent;
-  color: #cbd5e1;
+  color: var(--ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .document-title {
@@ -301,24 +303,27 @@ function selectNode(node: ReadonlyVaultTreeNode) {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  color: #8ea0b7;
+  color: var(--ink-faint);
   font-size: 11px;
 }
 
 .document-type {
-  color: #85c7bc;
+  color: var(--accent);
   font-weight: 800;
 }
 
-.tree-document:hover,
+.tree-document:hover {
+  background: var(--surface-2);
+}
+
 .tree-document-active {
-  background: #223042;
-  color: #f5f0e8;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .empty-tree {
   margin: 0;
   padding: 16px;
-  color: #8b98aa;
+  color: var(--ink-faint);
 }
 </style>
