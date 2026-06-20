@@ -5,6 +5,104 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
+/**
+ * AIChatRequest 由前端发起的划词 AI 解读请求。
+ */
+export class AIChatRequest {
+    "requestId": number;
+    "documentId": string;
+    "selectedText": string;
+    "question": string;
+    "history": AIMessage[];
+
+    /** Creates a new AIChatRequest instance. */
+    constructor($$source: Partial<AIChatRequest> = {}) {
+        if (!("requestId" in $$source)) {
+            this["requestId"] = 0;
+        }
+        if (!("documentId" in $$source)) {
+            this["documentId"] = "";
+        }
+        if (!("selectedText" in $$source)) {
+            this["selectedText"] = "";
+        }
+        if (!("question" in $$source)) {
+            this["question"] = "";
+        }
+        if (!("history" in $$source)) {
+            this["history"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AIChatRequest instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AIChatRequest {
+        const $$createField4_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("history" in $$parsedSource) {
+            $$parsedSource["history"] = $$createField4_0($$parsedSource["history"]);
+        }
+        return new AIChatRequest($$parsedSource as Partial<AIChatRequest>);
+    }
+}
+
+/**
+ * AIInfo 返回当前可用的 AI 配置信息（不含 apiKey），供前端展示与可用性判断。
+ */
+export class AIInfo {
+    "available": boolean;
+    "model"?: string;
+    "endpoint"?: string;
+
+    /** Creates a new AIInfo instance. */
+    constructor($$source: Partial<AIInfo> = {}) {
+        if (!("available" in $$source)) {
+            this["available"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AIInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AIInfo {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AIInfo($$parsedSource as Partial<AIInfo>);
+    }
+}
+
+/**
+ * AIMessage 是一条对话消息，role 为 user 或 assistant。
+ */
+export class AIMessage {
+    "role": string;
+    "content": string;
+
+    /** Creates a new AIMessage instance. */
+    constructor($$source: Partial<AIMessage> = {}) {
+        if (!("role" in $$source)) {
+            this["role"] = "";
+        }
+        if (!("content" in $$source)) {
+            this["content"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AIMessage instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AIMessage {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AIMessage($$parsedSource as Partial<AIMessage>);
+    }
+}
+
 export class DocumentResponse {
     "id": string;
     "title": string;
@@ -114,7 +212,7 @@ export class TreeNode {
      * Creates a new TreeNode instance from a string or object.
      */
     static createFrom($$source: any = {}): TreeNode {
-        const $$createField7_0 = $$createType1;
+        const $$createField7_0 = $$createType3;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("children" in $$parsedSource) {
             $$parsedSource["children"] = $$createField7_0($$parsedSource["children"]);
@@ -139,7 +237,7 @@ export class UnlockResponse {
      * Creates a new UnlockResponse instance from a string or object.
      */
     static createFrom($$source: any = {}): UnlockResponse {
-        const $$createField0_0 = $$createType1;
+        const $$createField0_0 = $$createType3;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("tree" in $$parsedSource) {
             $$parsedSource["tree"] = $$createField0_0($$parsedSource["tree"]);
@@ -149,5 +247,7 @@ export class UnlockResponse {
 }
 
 // Private type creation functions
-const $$createType0 = TreeNode.createFrom;
+const $$createType0 = AIMessage.createFrom;
 const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = TreeNode.createFrom;
+const $$createType3 = $Create.Array($$createType2);

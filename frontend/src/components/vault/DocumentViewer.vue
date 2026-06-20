@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import renderMathInElement from 'katex/contrib/auto-render'
 import type { PDFLoadState, VaultDocument } from '../../types/vault'
 
@@ -11,9 +11,17 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const emit = defineEmits<{
+  (event: 'aiSelect', text: string): void
+}>()
 const viewerRef = shallowRef<HTMLElement | null>(null)
 const markdownBodyRef = shallowRef<HTMLElement | null>(null)
 const pdfLoaded = shallowRef(false)
+const selectionButton = shallowRef<{ visible: boolean; top: number; left: number }>({
+  visible: false,
+  top: 0,
+  left: 0,
+})
 const fileSizeLabel = computed(() => formatSize(props.document?.size))
 // 正文首个一级标题：命中则从正文中移除，避免与顶部标题重复；未命中则为空，回退到文件名。
 const firstHeading = ref('')
@@ -145,6 +153,63 @@ watch(
   },
   { immediate: true },
 )
+
+// 划词 AI 解读：在 Markdown 正文中选中非空文本时，于选区附近显示「AI 解读」按钮。
+function isInsideMarkdownBody(node: Node | null): boolean {
+  if (!node || !markdownBodyRef.value) {
+    return false
+  }
+  return markdownBodyRef.value.contains(node)
+}
+
+function refreshSelectionButton() {
+  const selection = window.getSelection()
+  const text = (selection?.toString() || '').trim()
+  if (!text || !selection || selection.rangeCount === 0 || !isInsideMarkdownBody(selection.anchorNode)) {
+    selectionButton.value = { visible: false, top: 0, left: 0 }
+    return
+  }
+  const rect = selection.getRangeAt(0).getBoundingClientRect()
+  selectionButton.value = {
+    visible: true,
+    top: rect.top - 44,
+    left: rect.left + rect.width / 2 - 40,
+  }
+}
+
+function onSelectionChange() {
+  // selectionchange 在 document 上触发，只有落在 markdown 正文里才显示按钮。
+  const selection = window.getSelection()
+  if (!selection || selection.toString().trim() === '' || !isInsideMarkdownBody(selection.anchorNode)) {
+    selectionButton.value = { visible: false, top: 0, left: 0 }
+    return
+  }
+  refreshSelectionButton()
+}
+
+function onMouseUp(event: MouseEvent) {
+  if (!isInsideMarkdownBody(event.target as Node | null)) {
+    return
+  }
+  // 等一帧让选区稳定。
+  requestAnimationFrame(refreshSelectionButton)
+}
+
+function triggerAI() {
+  const text = (window.getSelection()?.toString() || '').trim()
+  selectionButton.value = { visible: false, top: 0, left: 0 }
+  if (text) {
+    emit('aiSelect', text)
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('selectionchange', onSelectionChange)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('selectionchange', onSelectionChange)
+})
 </script>
 
 <template>
@@ -178,12 +243,17 @@ watch(
         <h1 class="document-title">{{ headerTitle }}</h1>
         <p class="document-size markdown-size">{{ fileSizeLabel }}</p>
       </header>
-      <div ref="markdownBodyRef" class="markdown-body" v-html="document.html"></div>
+      <div ref="markdownBodyRef" class="markdown-body" v-html="document.html" @mouseup="onMouseUp"></div>
     </article>
-    <div v-else class="viewer-state">
-      <p class="state-title">请选择一篇文档或 PDF</p>
-      <p class="state-copy">目录加载完成后，内容只会在你点击条目时解密渲染。</p>
-    </div>
+    <button
+      v-if="selectionButton.visible"
+      type="button"
+      class="ai-selection-button"
+      :style="{ top: `${selectionButton.top}px`, left: `${selectionButton.left}px` }"
+      @click="triggerAI"
+    >
+      AI 解读
+    </button>
   </section>
 </template>
 
@@ -349,6 +419,35 @@ watch(
   font-size: 17px;
   line-height: 1.85;
   color: var(--ink);
+  /* 放开划词选中，仅限 Markdown 正文；PDF 与其它区域仍由 .viewer 的 user-select:none 禁用 */
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* 全局 * { user-select: none } 会直接命中正文每个子元素并阻断继承，
+   这里用 :deep(*) 强制让 Markdown 正文内所有元素可选，划词才能生效。 */
+.markdown-body :deep(*) {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ai-selection-button {
+  position: fixed;
+  z-index: 50;
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--paper);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+.ai-selection-button:hover {
+  background: var(--accent-strong);
 }
 
 .markdown-body :deep(.katex) {

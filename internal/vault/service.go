@@ -13,6 +13,7 @@ var (
 	ErrUnsupportedType     = errors.New("unsupported document type")
 	ErrInvalidChunk        = errors.New("invalid pdf chunk")
 	ErrDeviceNotAuthorized = errors.New("device not authorized")
+	ErrAINotConfigured     = errors.New("ai is not configured")
 )
 
 type Service struct {
@@ -27,12 +28,14 @@ type Service struct {
 	htmlCache   map[string]string
 	tree        []TreeNode
 	allowedMACs []string
+	aiConfig    AIConfig
 }
 
 func NewService(encrypted EncryptedVault) *Service {
 	return &Service{
 		encrypted:   encrypted,
 		allowedMACs: encrypted.AllowedMACs,
+		aiConfig:    encrypted.AIConfig,
 		documents:   make(map[string]DocumentMetadata),
 		payloads:    make(map[string]EncryptedDocument),
 		htmlCache:   make(map[string]string),

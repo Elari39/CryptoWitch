@@ -30,6 +30,7 @@ CryptoWitch 在构建阶段把 Markdown / PDF 文档加密并嵌入应用，运�
 - **设备白名单**：基于网卡 MAC 限制可查看文档的设备；`allowedMACs` 设为 `*` 或留空时退化为仅凭密码访问。
 - PDF 使用 1 MiB 明文块分块加密，前端按块加载后再交给内置 PDF 查看器打开。
 - Markdown 支持 GFM、代码高亮和 KaTeX 数学公式渲染，渲染结果在解锁会话内缓存。
+- **划词 AI 解读**（Markdown 文档）：在正文中划选片段即可送入 AI 上下文，支持多轮追问与会话内历史记录，回复流式输出在右侧抽屉展示。
 - 前端提供目录树、文档搜索、文档类型标识和大小提示。
 - Wails 窗口启用 `ContentProtectionEnabled`，并禁用右键、复制、选中、拖拽和常见快捷键。
 - 提供一键 Windows 构建脚本，也保留 Wails 原生命令。
@@ -139,6 +140,13 @@ password: "change-this-password"
 allowedMACs:
   - "AA:BB:CC:DD:EE:FF"
   # - "*"
+# 划词 AI 解读服务凭证（OpenAI 兼容 /chat/completions 接口）。
+# 构建期注入并编译进 exe；仅本地维护，不要提交到仓库。
+# 留空整段或字段时，运行时划词 AI 功能不可用。
+ai:
+  endpoint: "https://example.com/v1/chat/completions"
+  apiKey: "sk-your-api-key"
+  model: "your-model-name"
 ```
 
 字段说明：
@@ -147,6 +155,9 @@ allowedMACs:
 | --- | --- |
 | `password` | 构建期派生密钥的密码。运行时输入的密码必须与之相同，否则解锁失败。该密码不进入二进制。 |
 | `allowedMACs` | 网卡 MAC 白名单。命中任一即放行；含 `*` 或留空时跳过 MAC 校验。 |
+| `ai.endpoint` | 划词 AI 解读使用的 OpenAI 兼容 chat completions 接口地址。构建期注入二进制，运行时由后端调用。 |
+| `ai.apiKey` | 上述接口的 Bearer Token。明文凭证，仅本地维护，不要提交仓库。 |
+| `ai.model` | 调用使用的模型名。 |
 
 获取本机 MAC：
 
@@ -307,6 +318,8 @@ CryptoWitch 提供的是本地资料包的防护增强，**不是 DRM，也不�
 - 构建期密码不要写入仓库、脚本、README、命令历史或 CI 明文日志。`access.yaml` 含明文构建密码，仅本地维护，已加入 `.gitignore`。
 - `content/plain` 目录用于构建期明文源文档，正式发布前应确认没有把真实私密资料提交到版本库。
 - 加密后的 `generated.go` 会被编译进 exe，分发前应确认使用的是正确文档和正确密码重新生成的 vault。
+- **划词 AI 解读会突破纯本地边界**：划选的文档片段会发送到 `access.yaml` 中配置的 LLM `endpoint`，请仅在受信任的 AI 服务下使用。对话上下文与历史仅保存在解锁会话内存中，锁定或关闭后清空，不落盘。
+- `access.yaml` 的 `ai.apiKey` 是明文凭证，构建期编译进 exe；与构建密码一样仅本地维护，不要提交仓库、脚本或命令历史。
 
 ## 常见问题
 

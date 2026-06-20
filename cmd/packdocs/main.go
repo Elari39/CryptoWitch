@@ -36,6 +36,13 @@ type appConfig struct {
 type accessConfig struct {
 	Password    string   `yaml:"password"`
 	AllowedMACs []string `yaml:"allowedMACs"`
+	AI          aiAccessConfig `yaml:"ai"`
+}
+
+type aiAccessConfig struct {
+	Endpoint string `yaml:"endpoint"`
+	ApiKey   string `yaml:"apiKey"`
+	Model    string `yaml:"model"`
 }
 
 func main() {
@@ -81,6 +88,11 @@ func run(configPath, accessPath, contentDir, outputPath string) error {
 		return err
 	}
 	encrypted.AllowedMACs = access.AllowedMACs
+	encrypted.AIConfig = vault.AIConfig{
+		Endpoint: access.AI.Endpoint,
+		ApiKey:   access.AI.ApiKey,
+		Model:    access.AI.Model,
+	}
 
 	generated, err := renderGeneratedVault(encrypted)
 	if err != nil {
@@ -241,6 +253,11 @@ func renderGeneratedVault(encrypted vault.EncryptedVault) ([]byte, error) {
 		buffer.WriteString(fmt.Sprintf("%q", mac))
 	}
 	buffer.WriteString("},\n")
+	buffer.WriteString("\tAIConfig: AIConfig{\n")
+	buffer.WriteString(fmt.Sprintf("\t\tEndpoint: %q,\n", encrypted.AIConfig.Endpoint))
+	buffer.WriteString(fmt.Sprintf("\t\tApiKey:   %q,\n", encrypted.AIConfig.ApiKey))
+	buffer.WriteString(fmt.Sprintf("\t\tModel:    %q,\n", encrypted.AIConfig.Model))
+	buffer.WriteString("\t},\n")
 	buffer.WriteString("}\n")
 
 	formatted, err := format.Source(buffer.Bytes())

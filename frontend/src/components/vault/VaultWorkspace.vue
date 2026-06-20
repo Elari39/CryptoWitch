@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import AIPanel from './AIPanel.vue'
 import DocumentTree from './DocumentTree.vue'
 import DocumentViewer from './DocumentViewer.vue'
+import { useAI } from '../../composables/useAI'
 import type { PDFLoadState, ReadonlyVaultDocument, ReadonlyVaultTreeNode } from '../../types/vault'
 
 interface Props {
@@ -22,7 +24,15 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
+const ai = useAI()
+
 const activeId = computed(() => props.activeDocument?.id)
+
+function onAISelect(text: string) {
+  if (props.activeDocument) {
+    ai.openWithSelection(text, props.activeDocument.id)
+  }
+}
 </script>
 
 <template>
@@ -58,8 +68,11 @@ const activeId = computed(() => props.activeDocument?.id)
         :loading="documentLoading"
         :pdf-load="pdfLoad"
         :pdf-progress="pdfProgress"
+        @ai-select="onAISelect"
       />
     </section>
+
+    <AIPanel />
   </main>
 </template>
 

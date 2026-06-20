@@ -5,3 +5,10 @@ password: "change-this-password"
 allowedMACs:
   - "AA:BB:CC:DD:EE:FF"
   # - "*"
+# 划词 AI 解读服务凭证（OpenAI 兼容 /chat/completions 接口）。
+# 构建期注入并编译进 exe；仅本地维护，不要提交到仓库。
+# 留空整段或字段时，运行时划词 AI 功能不可用。
+ai:
+  endpoint: "https://example.com/v1/chat/completions"
+  apiKey: "sk-your-api-key"
+  model: "your-model-name"

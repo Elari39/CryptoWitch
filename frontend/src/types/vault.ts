@@ -1,7 +1,24 @@
-import type { DocumentResponse, TreeNode } from '../../bindings/cryptowitch/internal/vault'
+import type { AIChatRequest, AIInfo, AIMessage, DocumentResponse, TreeNode } from '../../bindings/cryptowitch/internal/vault'
 
 export type VaultTreeNode = TreeNode
 export type VaultDocument = DocumentResponse
+export type VaultAIChatRequest = AIChatRequest
+export type VaultAIInfo = AIInfo
+
+export interface VaultAIMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+/** 一段已归档的会话内历史对话。 */
+export interface VaultAIHistory {
+  id: number
+  title: string
+  documentId: string
+  selectedText: string
+  messages: VaultAIMessage[]
+  createdAt: number
+}
 
 export interface ReadonlyVaultTreeNode {
   readonly id?: string

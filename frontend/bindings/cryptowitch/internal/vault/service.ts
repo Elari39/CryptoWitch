@@ -9,21 +9,38 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
+/**
+ * AIChat 发起一次流式对话。方法在校验后立即返回，真正的流式读取在
+ * goroutine 中完成，增量通过 Wails 事件 ai:chunk / ai:done / ai:error 推送。
+ */
+export function AIChat(req: $models.AIChatRequest): $CancellablePromise<void> {
+    return $Call.ByID(3597321683, req);
+}
+
+/**
+ * GetAIInfo 返回当前 AI 配置的可用性与展示信息（不含 apiKey）。
+ */
+export function GetAIInfo(): $CancellablePromise<$models.AIInfo> {
+    return $Call.ByID(2668349555).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
 export function GetDocument(id: string): $CancellablePromise<$models.DocumentResponse> {
     return $Call.ByID(1841490028, id).then(($result: any) => {
-        return $$createType0($result);
+        return $$createType1($result);
     });
 }
 
 export function GetPDFChunk(id: string, index: number): $CancellablePromise<$models.PDFChunkResponse> {
     return $Call.ByID(2287281130, id, index).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType2($result);
     });
 }
 
 export function GetTree(): $CancellablePromise<$models.TreeNode[]> {
     return $Call.ByID(2630704765).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType4($result);
     });
 }
 
@@ -33,13 +50,14 @@ export function Lock(): $CancellablePromise<void> {
 
 export function Unlock(password: string): $CancellablePromise<$models.UnlockResponse> {
     return $Call.ByID(2110480459, password).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType5($result);
     });
 }
 
 // Private type creation functions
-const $$createType0 = $models.DocumentResponse.createFrom;
-const $$createType1 = $models.PDFChunkResponse.createFrom;
-const $$createType2 = $models.TreeNode.createFrom;
-const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = $models.UnlockResponse.createFrom;
+const $$createType0 = $models.AIInfo.createFrom;
+const $$createType1 = $models.DocumentResponse.createFrom;
+const $$createType2 = $models.PDFChunkResponse.createFrom;
+const $$createType3 = $models.TreeNode.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = $models.UnlockResponse.createFrom;

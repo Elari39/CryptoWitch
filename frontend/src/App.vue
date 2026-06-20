@@ -1,12 +1,25 @@
 <script setup lang="ts">
+import { watch } from 'vue'
 import UnlockPanel from './components/vault/UnlockPanel.vue'
 import VaultWorkspace from './components/vault/VaultWorkspace.vue'
 import { useInteractionGuard } from './composables/useInteractionGuard'
+import { useAI } from './composables/useAI'
 import { useVault } from './composables/useVault'
 
 useInteractionGuard()
 
 const vault = useVault()
+const ai = useAI()
+
+// 锁定后清空 AI 会话内上下文与历史，避免残留文档片段。
+watch(
+  () => vault.unlocked.value,
+  (unlocked) => {
+    if (!unlocked) {
+      ai.clearOnLock()
+    }
+  },
+)
 </script>
 
 <template>

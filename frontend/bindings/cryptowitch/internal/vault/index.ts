@@ -7,6 +7,9 @@ export {
 };
 
 export {
+    AIChatRequest,
+    AIInfo,
+    AIMessage,
     DocumentResponse,
     PDFChunkResponse,
     TreeNode,
