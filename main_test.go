@@ -9,7 +9,7 @@ func TestCSPPolicyDefaultBlocksRemoteImages(t *testing.T) {
 	policy := cspPolicy(false)
 	for _, want := range []string{
 		"default-src 'self'",
-		"script-src 'self' 'unsafe-inline'",
+		"script-src 'self'",
 		"style-src 'self' 'unsafe-inline'",
 		"img-src 'self' data: blob:",
 		"frame-src blob:",
@@ -21,6 +21,9 @@ func TestCSPPolicyDefaultBlocksRemoteImages(t *testing.T) {
 		if !strings.Contains(policy, want) {
 			t.Errorf("cspPolicy(false) missing %q in: %s", want, policy)
 		}
+	}
+	if strings.Contains(policy, "script-src 'self' 'unsafe-inline'") {
+		t.Errorf("cspPolicy(false) must not allow inline scripts: %s", policy)
 	}
 	if strings.Contains(policy, "https:") || strings.Contains(policy, "http:") {
 		t.Errorf("cspPolicy(false) must not allow remote images: %s", policy)

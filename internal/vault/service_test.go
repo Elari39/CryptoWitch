@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 func testService(t *testing.T) *Service {
@@ -320,6 +321,54 @@ func TestLegacyV2PDFStillReturnsFullPayload(t *testing.T) {
 	}
 	if document.ContentBase64 != "JVBERi0xLjQ=" {
 		t.Fatalf("ContentBase64 = %q, want legacy full payload", document.ContentBase64)
+	}
+}
+
+func TestUnlockThrottledAfterRepeatedFailures(t *testing.T) {
+	service := testService(t)
+
+	for attempt := 0; attempt < maxUnlockFailures; attempt++ {
+		if _, err := service.Unlock("wrong-password"); !errors.Is(err, ErrInvalidPassword) {
+			t.Fatalf("attempt %d error = %v, want ErrInvalidPassword", attempt, err)
+		}
+	}
+
+	// 冷却期内即使密码正确也拒绝。
+	if _, err := service.Unlock("correct-password"); !errors.Is(err, ErrTooManyAttempts) {
+		t.Fatalf("Unlock() during cooldown error = %v, want ErrTooManyAttempts", err)
+	}
+	if service.unlocked {
+		t.Fatal("unlocked = true, want false during cooldown")
+	}
+
+	// 手动解除冷却后，正确密码可解锁并重置计数。
+	service.mu.Lock()
+	service.unlockCooldownUntil = time.Time{}
+	service.mu.Unlock()
+	if _, err := service.Unlock("correct-password"); err != nil {
+		t.Fatalf("Unlock() after cooldown reset error = %v", err)
+	}
+	if service.unlockFailures != 0 {
+		t.Fatalf("unlockFailures = %d, want reset to 0 after success", service.unlockFailures)
+	}
+}
+
+func TestUnlockResetThrottleOnSuccess(t *testing.T) {
+	service := testService(t)
+
+	for attempt := 0; attempt < maxUnlockFailures-1; attempt++ {
+		if _, err := service.Unlock("wrong-password"); !errors.Is(err, ErrInvalidPassword) {
+			t.Fatalf("attempt %d error = %v, want ErrInvalidPassword", attempt, err)
+		}
+	}
+	if _, err := service.Unlock("correct-password"); err != nil {
+		t.Fatalf("Unlock() error = %v", err)
+	}
+	if service.unlockFailures != 0 {
+		t.Fatalf("unlockFailures = %d, want reset to 0 after success", service.unlockFailures)
+	}
+	if !service.unlockCooldownUntil.IsZero() {
+		t.Fatal("unlockCooldownUntil should be reset after success")
 	}
 }
 

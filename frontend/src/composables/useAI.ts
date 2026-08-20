@@ -149,6 +149,8 @@ function loadHistory(index: number) {
   }
   // 先把当前对话归档（若有），再恢复选中的历史。
   newConversation()
+  // 被恢复的对话从历史列表移出（转入当前对话），避免下次「新对话」重复归档。
+  histories.value = histories.value.filter((item) => item.id !== history.id)
   messages.value = [...history.messages]
   selectedContext.value = history.selectedText
   currentDocumentId.value = history.documentId
@@ -174,6 +176,19 @@ function clearOnLock() {
   failedPartial.value = false
   selectedModel.value = models.value[0] || ''
   requestId += 1
+}
+
+/**
+ * 发送历史：若末尾用户消息与当前问题相同则去掉，
+ * 避免同一条问题在 history 尾部与 question 参数中各出现一次。
+ * ask() 已用 slice(0,-1) 保证不变式，retry/regenerate 复用本函数兜底。
+ */
+function historyWithoutTrailingQuestion(historyMessages: VaultAIMessage[], question: string): VaultAIMessage[] {
+  const last = historyMessages[historyMessages.length - 1]
+  if (last && last.role === 'user' && last.content === question) {
+    return historyMessages.slice(0, -1)
+  }
+  return historyMessages
 }
 
 /**
@@ -249,7 +264,8 @@ async function retry() {
     }
     failedPartial.value = false
   }
-  startStream(lastQuestion.value, messages.value)
+  // 历史末尾若恰是当前问题（失败时未落助手消息），发送时去掉，避免重复发送。
+  startStream(lastQuestion.value, historyWithoutTrailingQuestion(messages.value, lastQuestion.value))
 }
 
 /** 重新生成：覆盖最后一条助手回答（同一问题再问一次，不追加新的用户消息）。 */
@@ -280,7 +296,8 @@ async function regenerate() {
     return
   }
   messages.value = messages.value.slice(0, -1) // 弹出被覆盖的助手回答
-  startStream(question, messages.value)
+  // 弹出后末尾是最近一条用户问题，发送历史时去掉它，由 question 参数单独携带。
+  startStream(question, historyWithoutTrailingQuestion(messages.value, question))
 }
 
 export function useAI() {

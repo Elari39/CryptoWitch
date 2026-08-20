@@ -9,7 +9,7 @@ import (
 const deviceWildcard = "*"
 
 // normalizeMAC 将 MAC 地址规范化为无分隔符的小写形式，便于忽略格式差异比对。
-// 例如 "AA-BB.CC:DD:ee:FF" -> "aabbccddee ff"（去除 :, -, .）。
+// 例如 "AA-BB.CC:DD:ee:FF" -> "aabbccddeeff"（去除 :, -, .）。
 func normalizeMAC(mac string) string {
 	trimmed := strings.ToLower(strings.TrimSpace(mac))
 	if trimmed == deviceWildcard {

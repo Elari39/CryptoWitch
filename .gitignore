@@ -11,6 +11,18 @@
 /access.yaml
 !/access.example.yaml
 
+# Build-time generated vault (contains encrypted documents + AI credentials)
+/internal/vault/generated.go
+
+# Legacy local build artifact
+/packdocs.exe
+
+# Claude Code local state
+.claude/
+
+# Wails bindings generation temp dirs
+frontend/.bindings-tmp-*/
+
 # OS and editor noise
 .DS_Store
 Thumbs.db

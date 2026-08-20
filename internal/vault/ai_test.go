@@ -24,30 +24,50 @@ func TestBuildAIMessagesTruncatesSelectedText(t *testing.T) {
 	}
 }
 
-func TestBuildAIMessagesInjectsSelectionOnce(t *testing.T) {
+func TestBuildAIMessagesInjectsSelectionWithHistory(t *testing.T) {
 	history := []AIMessage{
-		{Role: "user", Content: aiSelectedTextPrefix + "\n\n片段A\n\n请基于此片段回答我接下来的问题。"},
+		{Role: "user", Content: "首问"},
 		{Role: "assistant", Content: "回答1"},
-		{Role: "user", Content: "追问1"},
-		{Role: "assistant", Content: "回答2"},
 	}
-	req := AIChatRequest{
+	messages := buildAIMessages(AIChatRequest{
 		SelectedText: "片段A",
-		Question:     "追问2",
+		Question:     "追问",
 		History:      history,
+	})
+	// 对话接口为无状态请求，前端历史不含片段消息，因此每轮都要注入片段：
+	// system + 片段 + 2 条历史 + 当前问题。
+	if len(messages) != 1+1+len(history)+1 {
+		t.Fatalf("len(messages) = %d, want %d", len(messages), 1+1+len(history)+1)
 	}
-	messages := buildAIMessages(req)
-	// system + 4 条历史 + 当前问题；历史首条已携带片段，不得再注入新片段。
-	if len(messages) != 1+len(history)+1 {
-		t.Fatalf("len(messages) = %d, want %d", len(messages), 1+len(history)+1)
+	if !strings.HasPrefix(messages[1].Content, aiSelectedTextPrefix) {
+		t.Fatalf("selection not injected in follow-up turn: %#v", messages[1])
 	}
-	for index, message := range messages[1 : 1+len(history)] {
+	for index, message := range messages[2 : 2+len(history)] {
 		if message.Role != history[index].Role || message.Content != history[index].Content {
 			t.Fatalf("message %d = %#v, want history %#v", index, message, history[index])
 		}
 	}
-	if messages[len(messages)-1].Content != "追问2" {
+	if messages[len(messages)-1].Content != "追问" {
 		t.Fatalf("last message = %#v, want current question", messages[len(messages)-1])
+	}
+}
+
+func TestBuildAIMessagesTruncatesQuestionAndHistory(t *testing.T) {
+	history := []AIMessage{{Role: "user", Content: strings.Repeat("史", aiMaxHistoryMessageRunes+500)}}
+	messages := buildAIMessages(AIChatRequest{
+		SelectedText: "片段",
+		Question:     strings.Repeat("问", aiMaxQuestionRunes+500),
+		History:      history,
+	})
+	// system + 片段 + 1 条历史 + 问题
+	if len(messages) != 4 {
+		t.Fatalf("len(messages) = %d, want 4", len(messages))
+	}
+	if got := len([]rune(messages[2].Content)); got != aiMaxHistoryMessageRunes {
+		t.Fatalf("history message runes = %d, want %d", got, aiMaxHistoryMessageRunes)
+	}
+	if got := len([]rune(messages[3].Content)); got != aiMaxQuestionRunes {
+		t.Fatalf("question runes = %d, want %d", got, aiMaxQuestionRunes)
 	}
 }
 

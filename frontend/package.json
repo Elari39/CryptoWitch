@@ -11,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@wailsio/runtime": "3.0.0-alpha.79",
+    "@wailsio/runtime": "3.0.0-alpha.96",
     "highlight.js": "^11.12.0",
     "katex": "^0.17.0",
     "marked": "^18.0.10",

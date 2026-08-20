@@ -82,10 +82,12 @@ func main() {
 }
 
 // cspPolicy 生成 Content-Security-Policy 内容。
-// - script-src/style-src 保留 'unsafe-inline'：兼容 Wails runtime 注入与 KaTeX / goldmark 高亮的内联样式；
-// - connect-src 'self' 封死页面内 XSS 外联（Wails IPC 为同源 fetch，不受影响）；
-// - frame-src blob: 放行 PDF 分块查看器 iframe；
-// - img-src 默认仅同源/data/blob，allowRemoteImages 开启时追加 http/https。
+//   - script-src 仅 'self'：页面内注入的内联脚本一律无法执行（Wails 运行时经 WebView2
+//     原生注入，不受页面 CSP 约束，无需 'unsafe-inline'；KaTeX 只依赖 style-src）；
+//   - style-src 保留 'unsafe-inline'：兼容 KaTeX / goldmark 高亮的内联样式；
+//   - connect-src 'self' 封死页面内 XSS 外联（Wails IPC 为同源 fetch，不受影响）；
+//   - frame-src blob: 放行 PDF 分块查看器 iframe；
+//   - img-src 默认仅同源/data/blob，allowRemoteImages 开启时追加 http/https。
 func cspPolicy(allowRemoteImages bool) string {
 	imgSrc := "img-src 'self' data: blob:"
 	if allowRemoteImages {
@@ -93,7 +95,7 @@ func cspPolicy(allowRemoteImages bool) string {
 	}
 	return strings.Join([]string{
 		"default-src 'self'",
-		"script-src 'self' 'unsafe-inline'",
+		"script-src 'self'",
 		"style-src 'self' 'unsafe-inline'",
 		imgSrc,
 		"font-src 'self' data:",

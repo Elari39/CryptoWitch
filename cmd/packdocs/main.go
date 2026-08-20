@@ -39,8 +39,8 @@ type accessConfig struct {
 }
 
 type aiAccessConfig struct {
-	Endpoint string   `yaml:"endpoint"`
-	ApiKey   string   `yaml:"apiKey"`
+	Endpoint string `yaml:"endpoint"`
+	ApiKey   string `yaml:"apiKey"`
 	// Model 为旧格式单值模型，回退用；Models 为多模型数组，优先于 Model。
 	Model  string   `yaml:"model"`
 	Models []string `yaml:"models"`

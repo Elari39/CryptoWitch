@@ -14,6 +14,9 @@ function normalizeError(error: unknown): string {
   if (message.includes('invalid pdf chunk')) {
     return 'PDF 分块加载失败，请重新选择文档。'
   }
+  if (message.includes('corrupted')) {
+    return '文档数据损坏，无法解密。'
+  }
   if (message) {
     return message
   }
@@ -147,9 +150,13 @@ export function useVault() {
       tree.value = []
       activeDocument.value = null
       const message = caught instanceof Error ? caught.message : ''
-      error.value = message.includes('device not authorized')
-        ? '本机未授权，无法查看文档。'
-        : '密码不正确，无法解锁文档。'
+      if (message.includes('device not authorized')) {
+        error.value = '本机未授权，无法查看文档。'
+      } else if (message.includes('too many attempts')) {
+        error.value = '尝试次数过多，请稍后再试。'
+      } else {
+        error.value = '密码不正确，无法解锁文档。'
+      }
     } finally {
       loading.value = false
     }

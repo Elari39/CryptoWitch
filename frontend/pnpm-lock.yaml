@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@wailsio/runtime':
-        specifier: 3.0.0-alpha.79
-        version: 3.0.0-alpha.79
+        specifier: 3.0.0-alpha.96
+        version: 3.0.0-alpha.96
       highlight.js:
         specifier: ^11.12.0
         version: 11.12.0
@@ -231,8 +231,8 @@ packages:
   '@vue/shared@3.5.35':
     resolution: {integrity: sha512-zSbjL7gRXwks2ZQLRGCajBtBXEOXW9Ddhn/HvSdrGkE2dqGnumzW8XtusRrxrE9LvqtiqDXQ+A60Hp6mvdYxfA==}
 
-  '@wailsio/runtime@3.0.0-alpha.79':
-    resolution: {integrity: sha512-NITzxKmJsMEruc39L166lbPJVECxzcbdqpHVqOOF7Cu/7Zqk/e3B/gNpkUjhNyo5rVb3V1wpS8oEgLUmpu1cwA==}
+  '@wailsio/runtime@3.0.0-alpha.96':
+    resolution: {integrity: sha512-Vj682pT1yzJHHNvay6D4C5Uc8KSO3rx98n5kYFeAWUt80Cm9JKmYeCaWOO3Tx/Z9cdZb7LXnJuPIQddOAb6jLQ==}
 
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
@@ -669,7 +669,7 @@ snapshots:
 
   '@vue/shared@3.5.35': {}
 
-  '@wailsio/runtime@3.0.0-alpha.79': {}
+  '@wailsio/runtime@3.0.0-alpha.96': {}
 
   balanced-match@1.0.2: {}
 

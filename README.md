@@ -211,7 +211,7 @@ content/
 go run ./cmd/packdocs
 ```
 
-生成结果会更新 `internal/vault/generated.go`（构建产物，不要手工编辑）。若同时改动了 `access.yaml` 的密码或 MAC 白名单，也需重新执行该命令。
+生成结果会更新 `internal/vault/generated.go`（构建产物，不要手工编辑；已加入 `.gitignore`，不再随仓库提交，克隆后需先执行本命令生成）。若同时改动了 `access.yaml` 的密码或 MAC 白名单，也需重新执行该命令。
 
 ## 开发调试
 
@@ -292,6 +292,7 @@ go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.96 task windows:buil
 │  ├─ src/composables/           # 前端状态与交互防护逻辑
 │  └─ bindings/                  # Wails 生成的 TypeScript bindings
 ├─ internal/vault/               # vault 类型、加密、解密、目录树和 Markdown 渲染
+│  └─ generated.go               # 构建产物（packdocs 生成，不入库）
 ├─ scripts/build-exe.ps1         # Windows exe 构建脚本
 ├─ build-exe.cmd                 # 双击友好的 Windows 构建入口
 ├─ access.example.yaml           # 构建期密码与 MAC 白名单示例配置（提交）
@@ -346,7 +347,8 @@ CryptoWitch 提供的是本地资料包的防护增强，**不是 DRM，也不�
 - **Markdown 链接协议消毒**：渲染时仅保留 `http/https`、`mailto` 与相对路径链接，`javascript:`、`data:`、`vbscript:` 等协议会被清除，降低恶意文档触发 XSS 的风险。
 - **CSP 纵深防御**：生产构建会为页面注入 Content-Security-Policy（`script-src 'self'`、`connect-src 'self'`、`object-src 'none'` 等），即使文档中出现恶意内容也无法向外部服务发送数据或执行内联脚本之外的动作。
 - **远程图片默认禁止**：`config.yaml` 的 `vault.allowRemoteImages` 默认 `false`，文档中的外链图片不会加载，避免打开文档时向图源泄露 IP 与阅读行为；确需在线图片时再显式开启。
-- **AI 请求有长度上限**：划选片段最多取前 4000 字符，多轮追问仅携带最近 12 条历史消息；划选片段只随首轮提问发送一次，避免重复计费。
+- **AI 请求有长度上限**：划选片段最多取前 4000 字符，问题与单条历史消息各以 8000 字符为上限，多轮追问仅携带最近 12 条历史消息。由于对话接口是无状态请求，多轮追问时每轮都会重新携带划选片段；如对 token 成本敏感，可后续引入服务端会话缓存。
+- **解锁失败限速**：连续 5 次密码错误后进入冷却（约 30 秒起，随失败次数递增，最长约 8 分钟），抑制在线暴力猜解。注意离线爆破仍取决于密码强度，务必使用足够强的密码。
 
 ## 常见问题
 
@@ -365,6 +367,14 @@ CryptoWitch 提供的是本地资料包的防护增强，**不是 DRM，也不�
 ### 运行时提示“本机未授权，无法查看文档”怎么办？
 
 说明 `access.yaml` 中 `allowedMACs` 配置了具体 MAC，且本机网卡都不在白名单内。获取本机 MAC（`Get-NetAdapter | Select Name, MacAddress`）加入 `allowedMACs`，或将 `allowedMACs` 设为 `["*"]` 跳过 MAC 校验，再重新执行 `go run ./cmd/packdocs`。
+
+### 解锁时提示“尝试次数过多”怎么办？
+
+连续输错密码会触发冷却（约 30 秒起，随失败次数递增），等待冷却结束后再试即可。
+
+### 克隆仓库后运行 `go test ./...` 或 `go build` 失败怎么办？
+
+`internal/vault/generated.go` 不再随仓库提交。先复制并编辑 `access.yaml`，再执行 `go run ./cmd/packdocs` 生成 vault 即可。
 
 ### 可以只打包 Markdown，不放 PDF 吗？
 

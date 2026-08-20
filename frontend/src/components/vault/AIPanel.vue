@@ -185,6 +185,7 @@ watch(() => ai.partial.value, () => void scrollToBottom())
         v-model="input"
         class="ai-input"
         rows="2"
+        maxlength="8000"
         placeholder="输入追问，回车发送（Shift+回车换行）"
         :disabled="ai.streaming.value || !ai.available.value"
         @keydown="onKeydown"

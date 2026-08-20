@@ -19,11 +19,15 @@ const aiSystemPrompt = "你是一位严谨的文档解读助手。用户会从�
 
 // AI 请求的 token 控制上限：
 //   - 划选片段最多保留前 4000 个字符（按 rune 计），避免超长划选浪费 token；
+//   - 问题与单条历史消息各以 8000 个字符（按 rune 计）为上限，防止误操作或
+//     前端被篡改造成巨额 token 账单；
 //   - 多轮追问时只携带最近 12 条历史消息（约 6 轮问答）。
 const (
-	aiMaxSelectedTextRunes = 4000
-	aiMaxHistoryMessages   = 12
-	aiSelectedTextPrefix   = "以下是文档划选片段："
+	aiMaxSelectedTextRunes   = 4000
+	aiMaxQuestionRunes       = 8000
+	aiMaxHistoryMessageRunes = 8000
+	aiMaxHistoryMessages     = 12
+	aiSelectedTextPrefix     = "以下是文档划选片段："
 )
 
 // AI 流式请求的超时策略：
@@ -196,6 +200,14 @@ func (s *Service) streamAIChat(cfg AIConfig, body []byte, requestID int, session
 	case <-ttft.C:
 		cancel()
 		s.emitAI(aiEventError, requestID, session, "AI 首字响应超时（60 秒），请重试或切换模型。")
+		// Do goroutine 可能恰在超时前后拿到响应并塞入缓冲 channel；此时无人消费，
+		// 需在后台排干并关闭 response.Body，避免连接泄漏。
+		go func() {
+			result := <-doCh
+			if result.response != nil {
+				_ = result.response.Body.Close()
+			}
+		}()
 		return
 	}
 	defer response.Body.Close()
@@ -270,15 +282,15 @@ func (s *Service) emitAI(eventName string, requestID int, session uint64, data s
 }
 
 // buildAIMessages 把系统提示、划选片段、历史对话与当前问题组装成 OpenAI messages。
-// 划选片段只注入一次：若历史首条已携带片段（多轮追问），不再重复发送；
-// 片段超过 aiMaxSelectedTextRunes 时截断，历史仅保留最近 aiMaxHistoryMessages 条。
+// 对话接口为无状态请求，前端只保存面板消息而不保存片段本身，因此每轮请求都会
+// 注入一次划选片段（历史中不落盘片段消息）。片段超过 aiMaxSelectedTextRunes 时截断；
+// 问题与单条历史消息分别以 aiMaxQuestionRunes / aiMaxHistoryMessageRunes 为上限；
+// 历史仅保留最近 aiMaxHistoryMessages 条。
 func buildAIMessages(req AIChatRequest) []openAIMessage {
 	messages := []openAIMessage{{Role: "system", Content: aiSystemPrompt}}
 	selected := strings.TrimSpace(req.SelectedText)
-	if selected != "" && !historyAlreadyHasSelection(req.History) {
-		if runes := []rune(selected); len(runes) > aiMaxSelectedTextRunes {
-			selected = string(runes[:aiMaxSelectedTextRunes])
-		}
+	if selected != "" {
+		selected = truncateRunes(selected, aiMaxSelectedTextRunes)
 		messages = append(messages, openAIMessage{
 			Role:    "user",
 			Content: aiSelectedTextPrefix + "\n\n" + selected + "\n\n请基于此片段回答我接下来的问题。",
@@ -293,13 +305,13 @@ func buildAIMessages(req AIChatRequest) []openAIMessage {
 		if role != "user" && role != "assistant" {
 			continue
 		}
-		content := strings.TrimSpace(msg.Content)
+		content := truncateRunes(strings.TrimSpace(msg.Content), aiMaxHistoryMessageRunes)
 		if content == "" {
 			continue
 		}
 		messages = append(messages, openAIMessage{Role: role, Content: content})
 	}
-	question := strings.TrimSpace(req.Question)
+	question := truncateRunes(strings.TrimSpace(req.Question), aiMaxQuestionRunes)
 	if question == "" {
 		question = "请解读上述片段。"
 	}
@@ -307,12 +319,11 @@ func buildAIMessages(req AIChatRequest) []openAIMessage {
 	return messages
 }
 
-// historyAlreadyHasSelection 判断历史首条是否已携带划选片段
-// （首条 user 消息以固定前缀开头），避免多轮追问重复发送同一片段。
-func historyAlreadyHasSelection(history []AIMessage) bool {
-	if len(history) == 0 {
-		return false
+// truncateRunes 把字符串按 rune 截断到 max 长度（超出部分静默丢弃）。
+func truncateRunes(value string, max int) string {
+	runes := []rune(value)
+	if len(runes) <= max {
+		return value
 	}
-	first := history[0]
-	return first.Role == "user" && strings.HasPrefix(strings.TrimSpace(first.Content), aiSelectedTextPrefix)
+	return string(runes[:max])
 }

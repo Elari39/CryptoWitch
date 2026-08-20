@@ -172,8 +172,9 @@ function refreshSelectionButton() {
   const rect = selection.getRangeAt(0).getBoundingClientRect()
   selectionButton.value = {
     visible: true,
-    top: rect.top - 44,
-    left: rect.left + rect.width / 2 - 40,
+    // 选区靠近视口顶部时按钮会被裁出可视区，这里钳制在可视区内。
+    top: Math.max(12, rect.top - 44),
+    left: Math.min(Math.max(12, rect.left + rect.width / 2 - 40), window.innerWidth - 92),
   }
 }
 
