@@ -30,8 +30,8 @@ CryptoWitch 在构建阶段把 Markdown / PDF 文档加密并嵌入应用，运�
 - **设备白名单**：基于网卡 MAC 限制可查看文档的设备；`allowedMACs` 设为 `*` 或留空时退化为仅凭密码访问。
 - PDF 使用 1 MiB 明文块分块加密，前端按块加载后再交给内置 PDF 查看器打开。
 - Markdown 支持 GFM、代码高亮和 KaTeX 数学公式渲染，渲染结果在解锁会话内缓存。
-- **划词 AI 解读**（Markdown 文档）：在正文中划选片段即可送入 AI 上下文，支持多轮追问与会话内历史记录，回复流式输出在右侧抽屉展示。
-- 前端提供目录树、文档搜索、文档类型标识和大小提示。
+- **划词 AI 解读**（Markdown 文档）：在正文中划选片段即可送入 AI 上下文，支持多轮追问与会话内历史记录，回复流式输出并在右侧抽屉以 Markdown + LaTeX（KaTeX）渲染展示；代码块带语言标识、语法高亮与一键复制。支持**多模型切换**（access.yaml 的 `ai.models` 数组，请求携带所选模型并后端校验）、**失败重试**、最后一条回答**重新生成**，以及一键**复制回答**（Markdown 源码）。
+- 前端提供目录树、文档搜索、文档类型标识和大小提示；左侧目录与右侧 AI 面板支持收起/展开及拖拽调宽。
 - Wails 窗口启用 `ContentProtectionEnabled`，并禁用右键、复制、选中、拖拽和常见快捷键。
 - 提供一键 Windows 构建脚本，也保留 Wails 原生命令。
 
@@ -146,7 +146,11 @@ allowedMACs:
 ai:
   endpoint: "https://example.com/v1/chat/completions"
   apiKey: "sk-your-api-key"
-  model: "your-model-name"
+  # 多模型列表：运行时可在 AI 面板切换，列表首个为默认模型。
+  # 旧格式单值 model 仍受支持（回退），但推荐使用 models 数组。
+  models:
+    - "your-model-a"
+    - "your-model-b"
 ```
 
 字段说明：
@@ -157,7 +161,8 @@ ai:
 | `allowedMACs` | 网卡 MAC 白名单。命中任一即放行；含 `*` 或留空时跳过 MAC 校验。 |
 | `ai.endpoint` | 划词 AI 解读使用的 OpenAI 兼容 chat completions 接口地址。构建期注入二进制，运行时由后端调用。 |
 | `ai.apiKey` | 上述接口的 Bearer Token。明文凭证，仅本地维护，不要提交仓库。 |
-| `ai.model` | 调用使用的模型名。 |
+| `ai.models` | 可用模型名数组，列表首个为默认模型，运行时可在 AI 面板切换。**优先于** `ai.model`。 |
+| `ai.model` | 旧格式单值模型名，仅在 `ai.models` 未配置时作为回退。 |
 
 获取本机 MAC：
 

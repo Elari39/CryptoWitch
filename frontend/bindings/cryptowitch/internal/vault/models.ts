@@ -15,6 +15,11 @@ export class AIChatRequest {
     "question": string;
     "history": AIMessage[];
 
+    /**
+     * Model 为前端选中的模型名；为空时后端使用配置列表首个。
+     */
+    "model"?: string;
+
     /** Creates a new AIChatRequest instance. */
     constructor($$source: Partial<AIChatRequest> = {}) {
         if (!("requestId" in $$source)) {
@@ -51,10 +56,12 @@ export class AIChatRequest {
 
 /**
  * AIInfo 返回当前可用的 AI 配置信息（不含 apiKey），供前端展示与可用性判断。
+ * Models 为全部可选模型（access.yaml 的 ai.models，旧单值 ai.model 时仅含一个）。
  */
 export class AIInfo {
     "available": boolean;
     "model"?: string;
+    "models"?: string[];
     "endpoint"?: string;
 
     /** Creates a new AIInfo instance. */
@@ -70,7 +77,11 @@ export class AIInfo {
      * Creates a new AIInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): AIInfo {
+        const $$createField2_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("models" in $$parsedSource) {
+            $$parsedSource["models"] = $$createField2_0($$parsedSource["models"]);
+        }
         return new AIInfo($$parsedSource as Partial<AIInfo>);
     }
 }
@@ -237,7 +248,7 @@ export class TreeNode {
      * Creates a new TreeNode instance from a string or object.
      */
     static createFrom($$source: any = {}): TreeNode {
-        const $$createField7_0 = $$createType3;
+        const $$createField7_0 = $$createType4;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("children" in $$parsedSource) {
             $$parsedSource["children"] = $$createField7_0($$parsedSource["children"]);
@@ -262,7 +273,7 @@ export class UnlockResponse {
      * Creates a new UnlockResponse instance from a string or object.
      */
     static createFrom($$source: any = {}): UnlockResponse {
-        const $$createField0_0 = $$createType3;
+        const $$createField0_0 = $$createType4;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("tree" in $$parsedSource) {
             $$parsedSource["tree"] = $$createField0_0($$parsedSource["tree"]);
@@ -274,5 +285,6 @@ export class UnlockResponse {
 // Private type creation functions
 const $$createType0 = AIMessage.createFrom;
 const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = TreeNode.createFrom;
-const $$createType3 = $Create.Array($$createType2);
+const $$createType2 = $Create.Array($Create.Any);
+const $$createType3 = TreeNode.createFrom;
+const $$createType4 = $Create.Array($$createType3);

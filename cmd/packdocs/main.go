@@ -39,9 +39,11 @@ type accessConfig struct {
 }
 
 type aiAccessConfig struct {
-	Endpoint string `yaml:"endpoint"`
-	ApiKey   string `yaml:"apiKey"`
-	Model    string `yaml:"model"`
+	Endpoint string   `yaml:"endpoint"`
+	ApiKey   string   `yaml:"apiKey"`
+	// Model 为旧格式单值模型，回退用；Models 为多模型数组，优先于 Model。
+	Model  string   `yaml:"model"`
+	Models []string `yaml:"models"`
 }
 
 func main() {
@@ -92,6 +94,7 @@ func run(configPath, accessPath, contentDir, outputPath string) error {
 		Endpoint: access.AI.Endpoint,
 		ApiKey:   access.AI.ApiKey,
 		Model:    access.AI.Model,
+		Models:   access.AI.Models,
 	}
 
 	generated, err := renderGeneratedVault(encrypted)
@@ -261,7 +264,18 @@ func renderGeneratedVault(encrypted vault.EncryptedVault) ([]byte, error) {
 	buffer.WriteString("\tAIConfig: AIConfig{\n")
 	buffer.WriteString(fmt.Sprintf("\t\tEndpoint: %q,\n", encrypted.AIConfig.Endpoint))
 	buffer.WriteString(fmt.Sprintf("\t\tApiKey:   %q,\n", encrypted.AIConfig.ApiKey))
-	buffer.WriteString(fmt.Sprintf("\t\tModel:    %q,\n", encrypted.AIConfig.Model))
+	if len(encrypted.AIConfig.Models) > 0 {
+		buffer.WriteString("\t\tModels: []string{")
+		for i, model := range encrypted.AIConfig.Models {
+			if i > 0 {
+				buffer.WriteString(", ")
+			}
+			buffer.WriteString(fmt.Sprintf("%q", model))
+		}
+		buffer.WriteString("},\n")
+	} else {
+		buffer.WriteString(fmt.Sprintf("\t\tModel:    %q,\n", encrypted.AIConfig.Model))
+	}
 	buffer.WriteString("\t},\n")
 	buffer.WriteString("}\n")
 

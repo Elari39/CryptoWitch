@@ -89,7 +89,7 @@ func newMarkdownRenderer(allowRemoteImages bool) goldmark.Markdown {
 		goldmark.WithExtensions(
 			extension.GFM,
 			highlighting.NewHighlighting(
-				highlighting.WithStyle("friendly"),
+				highlighting.WithStyle("onedark"),
 			),
 		),
 		goldmark.WithParserOptions(

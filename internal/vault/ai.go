@@ -26,6 +26,15 @@ const (
 	aiSelectedTextPrefix   = "以下是文档划选片段："
 )
 
+// AI 流式请求的超时策略：
+//   - 首字 60 秒：从发起请求到收到响应头（TTFT）。思考型模型的思考阶段可能较长，
+//     但超过 60 秒基本可判定服务异常或网络问题，直接中断并提示；
+//   - 总时长 30 分钟：整段流式读取（含正文增量）的硬上限，超时后中断并提示内容可能不完整。
+const (
+	aiTTFTTimeout      = 60 * time.Second
+	aiMaxStreamTimeout = 1800 * time.Second
+)
+
 // aiEventChunk / aiEventDone / aiEventError 是推送给前端的事件名。
 const (
 	aiEventChunk = "ai:chunk"
@@ -58,16 +67,51 @@ type openAIStreamChunk struct {
 	} `json:"error,omitempty"`
 }
 
+// modelList 返回配置中的全部可用模型：ai.models 数组优先；
+// 旧格式 ai.model 单值作为回退；两者都未配置时返回 nil。
+func modelList(cfg AIConfig) []string {
+	if len(cfg.Models) > 0 {
+		return cfg.Models
+	}
+	if cfg.Model != "" {
+		return []string{cfg.Model}
+	}
+	return nil
+}
+
+// resolveAIModel 解析前端请求的模型：请求为空时取配置列表首个；
+// 请求命中列表时原样返回；否则返回错误（防御前端被篡改或配置变更）。
+func resolveAIModel(requested string, models []string) (string, error) {
+	if requested == "" {
+		if len(models) == 0 {
+			return "", errors.New("ai models are not configured")
+		}
+		return models[0], nil
+	}
+	for _, model := range models {
+		if model == requested {
+			return requested, nil
+		}
+	}
+	return "", fmt.Errorf("模型 %s 未在 access.yaml 的 ai.models 中配置", requested)
+}
+
 // GetAIInfo 返回当前 AI 配置的可用性与展示信息（不含 apiKey）。
 func (s *Service) GetAIInfo() (AIInfo, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	cfg := s.aiConfig
-	return AIInfo{
-		Available: cfg.Endpoint != "" && cfg.ApiKey != "" && cfg.Model != "",
-		Model:     cfg.Model,
+	models := modelList(cfg)
+	available := cfg.Endpoint != "" && cfg.ApiKey != "" && len(models) > 0
+	info := AIInfo{
+		Available: available,
+		Models:    models,
 		Endpoint:  cfg.Endpoint,
-	}, nil
+	}
+	if len(models) > 0 {
+		info.Model = models[0]
+	}
+	return info, nil
 }
 
 // AIChat 发起一次流式对话。方法在校验后立即返回，真正的流式读取在
@@ -87,13 +131,19 @@ func (s *Service) AIChat(req AIChatRequest) error {
 	if req.DocumentID != "" && !documentExists {
 		return ErrDocumentNotFound
 	}
-	if cfg.Endpoint == "" || cfg.ApiKey == "" || cfg.Model == "" {
+	if cfg.Endpoint == "" || cfg.ApiKey == "" || len(modelList(cfg)) == 0 {
 		return ErrAINotConfigured
+	}
+
+	// 校验所选模型属于配置列表（空请求回退到列表首个）。
+	model, err := resolveAIModel(req.Model, modelList(cfg))
+	if err != nil {
+		return err
 	}
 
 	messages := buildAIMessages(req)
 	body, err := json.Marshal(openAIStreamRequest{
-		Model:    cfg.Model,
+		Model:    model,
 		Stream:   true,
 		Messages: messages,
 	})
@@ -107,10 +157,11 @@ func (s *Service) AIChat(req AIChatRequest) error {
 }
 
 func (s *Service) streamAIChat(cfg AIConfig, body []byte, requestID int, session uint64) {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	// 总时长上限：请求与流式读取共用此上下文，到期后 net/http 会中断底层连接。
+	totalCtx, cancel := context.WithTimeout(context.Background(), aiMaxStreamTimeout)
 	defer cancel()
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.Endpoint, bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(totalCtx, http.MethodPost, cfg.Endpoint, bytes.NewReader(body))
 	if err != nil {
 		s.emitAI(aiEventError, requestID, session, "构建 AI 请求失败："+err.Error())
 		return
@@ -119,9 +170,32 @@ func (s *Service) streamAIChat(cfg AIConfig, body []byte, requestID int, session
 	request.Header.Set("Authorization", "Bearer "+cfg.ApiKey)
 	request.Header.Set("Accept", "text/event-stream")
 
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		s.emitAI(aiEventError, requestID, session, "AI 请求失败："+err.Error())
+	// 首字超时 60 秒：Do 在 goroutine 中执行，主流程等待响应头或超时中断。
+	type doResult struct {
+		response *http.Response
+		err      error
+	}
+	doCh := make(chan doResult, 1)
+	go func() {
+		response, doErr := http.DefaultClient.Do(request)
+		doCh <- doResult{response: response, err: doErr}
+	}()
+
+	ttft := time.NewTimer(aiTTFTTimeout)
+	defer ttft.Stop()
+
+	var response *http.Response
+	select {
+	case result := <-doCh:
+		if result.err != nil {
+			cancel()
+			s.emitAI(aiEventError, requestID, session, "AI 请求失败："+result.err.Error())
+			return
+		}
+		response = result.response
+	case <-ttft.C:
+		cancel()
+		s.emitAI(aiEventError, requestID, session, "AI 首字响应超时（60 秒），请重试或切换模型。")
 		return
 	}
 	defer response.Body.Close()
@@ -165,7 +239,12 @@ func (s *Service) streamAIChat(cfg AIConfig, body []byte, requestID int, session
 		s.emitAI(aiEventChunk, requestID, session, delta)
 	}
 	if err := scanner.Err(); err != nil && !errors.Is(err, io.EOF) {
-		s.emitAI(aiEventError, requestID, session, "读取 AI 响应失败："+err.Error())
+		// 总时长上限到期时，net/http 会以 deadline/cancel 类错误中断读取。
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			s.emitAI(aiEventError, requestID, session, "读取 AI 响应超时（最长 30 分钟），内容可能不完整。")
+		} else {
+			s.emitAI(aiEventError, requestID, session, "读取 AI 响应失败："+err.Error())
+		}
 		return
 	}
 	s.emitAI(aiEventDone, requestID, session, "")

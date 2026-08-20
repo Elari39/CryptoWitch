@@ -196,22 +196,22 @@ function selectNode(node: ReadonlyVaultTreeNode) {
 .tree-search {
   width: 100%;
   height: 36px;
-  border: 1px solid var(--rule-strong);
-  border-radius: 6px;
-  padding: 0 11px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 0 12px;
   outline: none;
-  background: var(--surface);
+  background: var(--canvas);
   color: var(--ink);
 }
 
 .tree-search:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 .tree-count {
   margin: 0;
-  color: var(--ink-faint);
+  color: var(--muted-soft);
   font-size: 12px;
 }
 
@@ -239,12 +239,12 @@ function selectNode(node: ReadonlyVaultTreeNode) {
   width: 100%;
   min-height: 34px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 8px 10px;
   background: transparent;
-  color: var(--accent);
+  color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   font-family: inherit;
   text-align: left;
   text-transform: uppercase;
@@ -253,11 +253,11 @@ function selectNode(node: ReadonlyVaultTreeNode) {
 }
 
 .folder-label:hover {
-  background: var(--surface-2);
+  background: var(--surface-soft);
 }
 
 .folder-chevron {
-  color: var(--ink-faint);
+  color: var(--muted-soft);
   font-size: 13px;
 }
 
@@ -272,7 +272,7 @@ function selectNode(node: ReadonlyVaultTreeNode) {
   height: auto;
   overflow: visible;
   padding: 0 0 0 10px;
-  border-left: 1px solid var(--rule);
+  border-left: 1px solid var(--hairline);
 }
 
 .tree-document {
@@ -281,10 +281,10 @@ function selectNode(node: ReadonlyVaultTreeNode) {
   width: 100%;
   min-height: 46px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 8px 10px;
   background: transparent;
-  color: var(--ink);
+  color: var(--body);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -303,27 +303,31 @@ function selectNode(node: ReadonlyVaultTreeNode) {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  color: var(--ink-faint);
+  color: var(--muted-soft);
   font-size: 11px;
 }
 
 .document-type {
-  color: var(--accent);
-  font-weight: 800;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-card);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .tree-document:hover {
-  background: var(--surface-2);
+  background: var(--surface-soft);
 }
 
 .tree-document-active {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
+  background: var(--surface-card);
+  color: var(--ink);
 }
 
 .empty-tree {
   margin: 0;
   padding: 16px;
-  color: var(--ink-faint);
+  color: var(--muted-soft);
 }
 </style>

@@ -11,4 +11,8 @@ allowedMACs:
 ai:
   endpoint: "https://example.com/v1/chat/completions"
   apiKey: "sk-your-api-key"
-  model: "your-model-name"
+  # 多模型列表：运行时可在 AI 面板切换，列表首个为默认模型。
+  # 旧格式单值 model 仍受支持（回退），但推荐使用 models 数组。
+  models:
+    - "your-model-a"
+    - "your-model-b"

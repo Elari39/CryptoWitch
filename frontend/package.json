@@ -11,8 +11,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@wailsio/runtime": "latest",
+    "@wailsio/runtime": "3.0.0-alpha.79",
+    "highlight.js": "^11.12.0",
     "katex": "^0.17.0",
+    "marked": "^18.0.10",
     "vue": "^3.2.45"
   },
   "devDependencies": {

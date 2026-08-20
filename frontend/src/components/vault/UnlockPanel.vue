@@ -75,64 +75,64 @@ function submit() {
   display: grid;
   place-items: center;
   padding: 32px;
-  background: linear-gradient(160deg, var(--paper), var(--paper-warm));
+  background: var(--canvas);
 }
 
 .unlock-panel {
   width: min(420px, 100%);
-  padding: 32px;
-  border: 1px solid var(--rule);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  padding: 40px 36px;
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  background: var(--canvas);
 }
 
 .brand-mark {
   display: block;
   width: 48px;
   height: 48px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
   border-radius: 8px;
 }
 
 .eyebrow {
-  margin: 0 0 8px;
-  color: var(--accent);
+  margin: 0 0 10px;
+  color: var(--primary);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 1.5px;
 }
 
 .title {
   margin: 0;
-  color: var(--ink-strong);
-  font-size: 34px;
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 36px;
+  font-weight: 500;
   line-height: 1.15;
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
-  margin: 12px 0 12px;
-  color: var(--ink-muted);
+  margin: 14px 0 14px;
+  color: var(--muted);
 }
 
 .author-line {
   margin: 0 0 28px;
-  color: var(--ink-faint);
+  color: var(--muted-soft);
   font-size: 13px;
 }
 
 .author-link {
-  color: var(--accent);
-  font-weight: 700;
-  text-decoration: none;
-  border-bottom: 1px dashed var(--accent);
-  padding-bottom: 1px;
+  color: var(--primary);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .author-link:hover {
-  color: var(--accent-strong);
-  border-bottom-color: var(--accent-strong);
+  color: var(--primary-active);
 }
 
 .unlock-form {
@@ -141,55 +141,57 @@ function submit() {
 }
 
 .field-label {
-  color: var(--ink);
+  color: var(--body-strong);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .password-input {
   width: 100%;
-  height: 44px;
+  height: 40px;
   box-sizing: border-box;
-  border: 1px solid var(--rule-strong);
-  border-radius: 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
   padding: 0 14px;
   outline: none;
-  background: var(--surface);
+  background: var(--canvas);
   color: var(--ink);
   font-size: 15px;
 }
 
 .password-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 .unlock-button {
-  height: 44px;
+  height: 40px;
   border: 0;
-  border-radius: 6px;
-  background: var(--accent);
-  color: var(--surface);
-  font-weight: 800;
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
 .unlock-button:hover:not(:disabled) {
-  background: var(--accent-strong);
+  background: var(--primary-active);
 }
 
 .unlock-button:disabled {
   cursor: not-allowed;
-  opacity: 0.58;
+  background: var(--primary-disabled);
+  color: var(--muted);
 }
 
 .error-message {
   margin: 16px 0 0;
   padding: 10px 12px;
-  border-radius: 6px;
-  background: var(--accent-wash);
-  color: var(--accent-strong);
+  border-radius: 8px;
+  background: var(--error-wash);
+  color: var(--error);
   font-size: 14px;
 }
 </style>

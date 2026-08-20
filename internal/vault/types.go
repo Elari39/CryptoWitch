@@ -21,10 +21,13 @@ type EncryptedVault struct {
 }
 
 // AIConfig 是划词 AI 解读的服务凭证，构建期由 access.yaml 注入并嵌入 generated.go。
+// Models 为多模型列表（access.yaml 的 ai.models），优先使用；
+// Model 保留兼容旧格式（ai.model 单值），仅在 Models 为空时作为回退。
 type AIConfig struct {
-	Endpoint string `json:"endpoint,omitempty"`
-	ApiKey   string `json:"apiKey,omitempty"`
-	Model    string `json:"model,omitempty"`
+	Endpoint string   `json:"endpoint,omitempty"`
+	ApiKey   string   `json:"apiKey,omitempty"`
+	Model    string   `json:"model,omitempty"`
+	Models   []string `json:"models,omitempty"`
 }
 
 type EncryptedPayload struct {
@@ -113,13 +116,17 @@ type AIChatRequest struct {
 	SelectedText string      `json:"selectedText"`
 	Question     string      `json:"question"`
 	History      []AIMessage `json:"history"`
+	// Model 为前端选中的模型名；为空时后端使用配置列表首个。
+	Model string `json:"model,omitempty"`
 }
 
 // AIInfo 返回当前可用的 AI 配置信息（不含 apiKey），供前端展示与可用性判断。
+// Models 为全部可选模型（access.yaml 的 ai.models，旧单值 ai.model 时仅含一个）。
 type AIInfo struct {
-	Available bool   `json:"available"`
-	Model     string `json:"model,omitempty"`
-	Endpoint  string `json:"endpoint,omitempty"`
+	Available bool     `json:"available"`
+	Model     string   `json:"model,omitempty"`
+	Models    []string `json:"models,omitempty"`
+	Endpoint  string   `json:"endpoint,omitempty"`
 }
 
 // SecurityPolicy 返回运行时安全策略信息，供宿主（main.go）注入 CSP 使用。

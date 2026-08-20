@@ -13,6 +13,8 @@ interface AIEventPayload {
 const open = shallowRef(false)
 const available = shallowRef(false)
 const model = shallowRef('')
+const models = shallowRef<string[]>([])
+const selectedModel = shallowRef('')
 const messages = shallowRef<VaultAIMessage[]>([])
 const histories = shallowRef<VaultAIHistory[]>([])
 const streaming = shallowRef(false)
@@ -20,6 +22,8 @@ const partial = shallowRef('')
 const selectedContext = shallowRef('')
 const error = shallowRef('')
 const currentDocumentId = shallowRef('')
+const lastQuestion = shallowRef('')
+const failedPartial = shallowRef(false)
 let requestId = 0
 let historyCounter = 0
 let listenersBound = false
@@ -57,8 +61,9 @@ function bindListeners() {
       return
     }
     error.value = payload.data || 'AI 解读失败，请稍后重试。'
-    // 已累积的部分内容仍保留为一条助手消息，避免丢失。
+    // 已累积的部分内容仍保留为一条助手消息，避免丢失；记录标记以便重试时移除。
     if (partial.value) {
+      failedPartial.value = true
       finalizeAssistant()
     } else {
       streaming.value = false
@@ -83,8 +88,19 @@ async function ensureInfo() {
     const info = await VaultService.GetAIInfo()
     available.value = info.available
     model.value = info.model || ''
+    models.value =
+      info.models && info.models.length > 0 ? info.models : info.model ? [info.model] : []
+    if (!selectedModel.value && models.value.length > 0) {
+      selectedModel.value = models.value[0]
+    }
   } catch {
     available.value = false
+  }
+}
+
+function setModel(name: string) {
+  if (models.value.includes(name)) {
+    selectedModel.value = name
   }
 }
 
@@ -121,6 +137,8 @@ function newConversation() {
   partial.value = ''
   error.value = ''
   streaming.value = false
+  lastQuestion.value = ''
+  failedPartial.value = false
   requestId += 1 // 让进行中的流式回调失效
 }
 
@@ -134,6 +152,13 @@ function loadHistory(index: number) {
   messages.value = [...history.messages]
   selectedContext.value = history.selectedText
   currentDocumentId.value = history.documentId
+  // 恢复历史后，重试/重新生成以其中最近一条用户问题为准。
+  for (let i = messages.value.length - 1; i >= 0; i--) {
+    if (messages.value[i].role === 'user') {
+      lastQuestion.value = messages.value[i].content
+      break
+    }
+  }
 }
 
 function clearOnLock() {
@@ -145,7 +170,43 @@ function clearOnLock() {
   error.value = ''
   streaming.value = false
   open.value = false
+  lastQuestion.value = ''
+  failedPartial.value = false
+  selectedModel.value = models.value[0] || ''
   requestId += 1
+}
+
+/**
+ * 发起流式请求的核心：直接携带给定历史发送，不再追加用户消息。
+ * ask / retry / regenerate 共用，保证模型选择与错误处理一致。
+ */
+function startStream(question: string, historyMessages: VaultAIMessage[]) {
+  error.value = ''
+  requestId += 1
+  const currentRequestId = requestId
+  streaming.value = true
+  partial.value = ''
+
+  const history = historyMessages.map((message) => ({
+    role: message.role,
+    content: message.content,
+  }))
+
+  VaultService.AIChat(
+    new AIChatRequest({
+      requestId: currentRequestId,
+      documentId: currentDocumentId.value,
+      selectedText: selectedContext.value,
+      question,
+      history,
+      model: selectedModel.value,
+    }),
+  ).catch((caught) => {
+    if (currentRequestId === requestId) {
+      error.value = caught instanceof Error ? caught.message : 'AI 解读请求失败。'
+      streaming.value = false
+    }
+  })
 }
 
 async function ask(question: string) {
@@ -161,33 +222,65 @@ async function ask(question: string) {
     return
   }
 
-  error.value = ''
-  requestId += 1
-  const currentRequestId = requestId
+  lastQuestion.value = trimmed
+  failedPartial.value = false
   const nextMessages: VaultAIMessage[] = [...messages.value, { role: 'user', content: trimmed }]
   messages.value = nextMessages
-  streaming.value = true
-  partial.value = ''
+  startStream(trimmed, nextMessages.slice(0, -1))
+}
 
-  // 历史上下文：去掉最后一条（当前问题），其余作为 history 传入后端。
-  const history = nextMessages.slice(0, -1).map((message) => ({ role: message.role, content: message.content }))
+/** 重试：重新发送最后一条问题（可先切换模型再重试）。 */
+async function retry() {
+  if (streaming.value || !lastQuestion.value) {
+    return
+  }
+  if (!available.value) {
+    await ensureInfo()
+  }
+  if (!available.value) {
+    error.value = '未配置划词 AI 服务，无法解读。'
+    return
+  }
+  // 失败时若已落成一条不完整的助手消息（部分内容），先移除再重发。
+  if (failedPartial.value) {
+    const last = messages.value[messages.value.length - 1]
+    if (last && last.role === 'assistant') {
+      messages.value = messages.value.slice(0, -1)
+    }
+    failedPartial.value = false
+  }
+  startStream(lastQuestion.value, messages.value)
+}
 
-  try {
-    await VaultService.AIChat(
-      new AIChatRequest({
-        requestId: currentRequestId,
-        documentId: currentDocumentId.value,
-        selectedText: selectedContext.value,
-        question: trimmed,
-        history,
-      }),
-    )
-  } catch (caught) {
-    if (currentRequestId === requestId) {
-      error.value = caught instanceof Error ? caught.message : 'AI 解读请求失败。'
-      streaming.value = false
+/** 重新生成：覆盖最后一条助手回答（同一问题再问一次，不追加新的用户消息）。 */
+async function regenerate() {
+  if (streaming.value || error.value) {
+    return
+  }
+  const last = messages.value[messages.value.length - 1]
+  if (!last || last.role !== 'assistant') {
+    return
+  }
+  if (!available.value) {
+    await ensureInfo()
+  }
+  if (!available.value) {
+    error.value = '未配置划词 AI 服务，无法解读。'
+    return
+  }
+  // 回溯最近一条用户消息作为重发问题。
+  let question = ''
+  for (let i = messages.value.length - 1; i >= 0; i--) {
+    if (messages.value[i].role === 'user') {
+      question = messages.value[i].content
+      break
     }
   }
+  if (!question) {
+    return
+  }
+  messages.value = messages.value.slice(0, -1) // 弹出被覆盖的助手回答
+  startStream(question, messages.value)
 }
 
 export function useAI() {
@@ -196,15 +289,21 @@ export function useAI() {
     open: readonly(open),
     available: readonly(available),
     model: readonly(model),
+    models: readonly(models),
+    selectedModel: readonly(selectedModel),
     messages: readonly(messages),
     histories: readonly(histories),
     streaming: readonly(streaming),
     partial: readonly(partial),
     selectedContext: readonly(selectedContext),
     error: readonly(error),
+    lastQuestion: readonly(lastQuestion),
     openWithSelection,
     close,
     ask,
+    retry,
+    regenerate,
+    setModel,
     newConversation,
     loadHistory,
     clearOnLock,

@@ -264,10 +264,10 @@ onBeforeUnmount(() => {
   overflow: auto;
   overscroll-behavior: contain;
   scroll-behavior: smooth;
-  background: var(--paper);
+  background: var(--canvas);
   color: var(--ink);
   user-select: none;
-  scrollbar-color: var(--rule-strong) var(--paper);
+  scrollbar-color: var(--hairline-soft) var(--canvas);
   scrollbar-width: thin;
 }
 
@@ -276,17 +276,17 @@ onBeforeUnmount(() => {
 }
 
 .viewer::-webkit-scrollbar-track {
-  background: var(--paper);
+  background: var(--canvas);
 }
 
 .viewer::-webkit-scrollbar-thumb {
-  border: 3px solid var(--paper);
+  border: 3px solid var(--canvas);
   border-radius: 999px;
-  background: var(--rule-strong);
+  background: var(--hairline);
 }
 
 .viewer::-webkit-scrollbar-thumb:hover {
-  background: var(--ink-faint);
+  background: var(--muted-soft);
 }
 
 .viewer-state {
@@ -294,15 +294,17 @@ onBeforeUnmount(() => {
   place-content: center;
   min-height: 100%;
   padding: 32px;
-  color: var(--ink-muted);
+  color: var(--muted);
   text-align: center;
 }
 
 .state-title {
   margin: 0 0 8px;
-  color: var(--ink-strong);
+  color: var(--ink);
+  font-family: var(--font-serif);
   font-size: 24px;
-  font-weight: 800;
+  font-weight: 500;
+  line-height: 1.3;
 }
 
 .state-copy {
@@ -321,7 +323,7 @@ onBeforeUnmount(() => {
   grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
   min-height: 0;
-  background: var(--paper-warm);
+  background: var(--surface-soft);
 }
 
 .pdf-header {
@@ -331,17 +333,15 @@ onBeforeUnmount(() => {
   gap: 16px;
   margin: 0;
   padding: 18px 24px;
-  border-bottom: 1px solid var(--rule);
-  background: var(--surface);
-}
-
-.pdf-header .document-kicker {
-  color: var(--accent);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--canvas);
 }
 
 .pdf-header .document-title {
-  color: var(--ink-strong);
+  color: var(--ink);
+  font-family: var(--font-serif);
   font-size: 22px;
+  font-weight: 500;
 }
 
 .pdf-frame-wrap {
@@ -354,14 +354,14 @@ onBeforeUnmount(() => {
   inset: 0;
   display: grid;
   place-content: center;
-  color: var(--ink-muted);
-  background: var(--paper-warm);
+  color: var(--muted);
+  background: var(--surface-soft);
 }
 
 .pdf-progress {
   width: min(320px, 70vw);
   height: 10px;
-  accent-color: var(--accent);
+  accent-color: var(--primary);
 }
 
 .pdf-frame {
@@ -369,14 +369,14 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 0;
   border: 0;
-  background: var(--surface-2);
+  background: var(--surface-soft);
 }
 
 .document-header {
   margin-bottom: 28px;
   padding-bottom: 20px;
   border-bottom: 1px solid transparent;
-  background-image: linear-gradient(90deg, transparent, var(--rule), transparent);
+  background-image: linear-gradient(90deg, transparent, var(--hairline), transparent);
   background-position: bottom;
   background-size: 100% 1px;
   background-repeat: no-repeat;
@@ -384,41 +384,43 @@ onBeforeUnmount(() => {
 
 .document-kicker {
   display: inline-block;
-  margin: 0 0 8px;
-  padding: 2px 8px;
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  color: var(--accent);
+  margin: 0 0 10px;
+  padding: 3px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--surface-card);
+  color: var(--ink);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .document-title {
   margin: 0;
-  color: var(--ink-strong);
+  color: var(--ink);
   font-family: var(--font-serif);
   font-size: 34px;
+  font-weight: 500;
   line-height: 1.2;
 }
 
 .document-size {
   margin: 0;
-  color: var(--ink-faint);
+  color: var(--muted-soft);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .markdown-size {
   margin-top: 8px;
-  color: var(--ink-muted);
+  color: var(--muted);
 }
 
 .markdown-body {
   font-size: 17px;
   line-height: 1.85;
-  color: var(--ink);
+  color: var(--body);
   /* 放开划词选中，仅限 Markdown 正文；PDF 与其它区域仍由 .viewer 的 user-select:none 禁用 */
   user-select: text;
   -webkit-user-select: text;
@@ -434,20 +436,21 @@ onBeforeUnmount(() => {
 .ai-selection-button {
   position: fixed;
   z-index: 50;
-  padding: 6px 12px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  background: var(--accent);
-  color: var(--paper);
+  padding: 7px 14px;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--on-primary);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   font-family: var(--font-ui);
   cursor: pointer;
   box-shadow: var(--shadow);
 }
 
 .ai-selection-button:hover {
-  background: var(--accent-strong);
+  background: var(--primary-active);
+  border-color: var(--primary-active);
 }
 
 .markdown-body :deep(.katex) {
@@ -472,22 +475,22 @@ onBeforeUnmount(() => {
 .markdown-body :deep(h5),
 .markdown-body :deep(h6) {
   margin: 28px 0 12px;
-  color: var(--ink-strong);
+  color: var(--ink);
   font-family: var(--font-serif);
   line-height: 1.3;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .markdown-body :deep(h1) {
   font-size: 1.7em;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--hairline);
 }
 
 .markdown-body :deep(h2) {
   font-size: 1.4em;
   padding-bottom: 6px;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--hairline);
 }
 
 .markdown-body :deep(h3) {
@@ -501,7 +504,7 @@ onBeforeUnmount(() => {
 .markdown-body :deep(h5),
 .markdown-body :deep(h6) {
   font-size: 0.95em;
-  color: var(--ink-muted);
+  color: var(--muted);
 }
 
 .markdown-body :deep(p) {
@@ -519,31 +522,31 @@ onBeforeUnmount(() => {
 }
 
 .markdown-body :deep(li::marker) {
-  color: var(--accent);
+  color: var(--primary);
 }
 
 .markdown-body :deep(a) {
-  color: var(--accent);
+  color: var(--primary);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .markdown-body :deep(a:hover) {
-  color: var(--accent-strong);
+  color: var(--primary-active);
 }
 
 .markdown-body :deep(strong) {
-  color: var(--ink-strong);
-  font-weight: 700;
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .markdown-body :deep(blockquote) {
   margin: 20px 0;
   padding: 12px 18px;
-  border-left: 3px solid var(--accent);
-  border-radius: 0 6px 6px 0;
-  background: var(--accent-wash);
-  color: var(--ink-muted);
+  border-left: 3px solid var(--primary);
+  border-radius: 0 8px 8px 0;
+  background: var(--primary-wash);
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -555,15 +558,14 @@ onBeforeUnmount(() => {
   height: 1px;
   margin: 28px 0;
   border: 0;
-  background: linear-gradient(90deg, transparent, var(--rule-strong), transparent);
+  background: linear-gradient(90deg, transparent, var(--hairline), transparent);
 }
 
 .markdown-body :deep(img) {
   max-width: 100%;
   height: auto;
-  border-radius: 6px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  border-radius: 12px;
+  background: var(--surface-soft);
 }
 
 .markdown-body :deep(.md-figure) {
@@ -577,7 +579,7 @@ onBeforeUnmount(() => {
 
 .markdown-body :deep(.md-figure-caption) {
   margin: 10px 0 0;
-  color: var(--ink-faint);
+  color: var(--muted-soft);
   font-size: 13px;
   font-style: italic;
   font-family: var(--font-ui);
@@ -589,10 +591,10 @@ onBeforeUnmount(() => {
   padding: 14px 18px;
   max-width: 100%;
   box-sizing: border-box;
-  border: 1px dashed var(--rule-strong);
-  border-radius: 6px;
-  background: var(--surface-2);
-  color: var(--ink-faint);
+  border: 1px dashed var(--hairline);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--muted-soft);
   font-size: 13px;
   font-family: var(--font-ui);
   word-break: break-all;
@@ -608,25 +610,26 @@ onBeforeUnmount(() => {
 .markdown-body :deep(th),
 .markdown-body :deep(td) {
   padding: 8px 12px;
-  border: 1px solid var(--rule);
+  border: 1px solid var(--hairline);
   text-align: left;
 }
 
 .markdown-body :deep(th) {
-  background: var(--surface-2);
-  color: var(--ink-strong);
-  font-weight: 700;
+  background: var(--surface-soft);
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .markdown-body :deep(tr:nth-child(even)) {
-  background: var(--accent-wash);
+  background: var(--surface-soft);
 }
 
 .markdown-body :deep(code) {
   border-radius: 4px;
   padding: 2px 5px;
-  background: var(--code-bg);
-  color: var(--code-ink);
+  background: var(--surface-soft);
+  border: 1px solid var(--hairline-soft);
+  color: var(--body-strong);
   font-family: var(--font-mono);
   font-size: 0.9em;
 }
@@ -635,15 +638,13 @@ onBeforeUnmount(() => {
   position: relative;
   overflow: auto;
   margin: 24px 0;
-  border: 1px solid var(--pre-border);
-  border-top: 2px solid var(--accent);
-  border-radius: 8px;
+  border: 1px solid var(--surface-dark-elevated);
+  border-radius: 12px;
   padding: 20px 22px;
-  /* !important 覆盖 goldmark-highlighting 内联到 <pre> 的深色/浅灰背景，统一为水墨纸色 */
+  /* !important 覆盖 goldmark-highlighting 内联到 <pre> 的浅色背景，统一为深海军代码窗 */
   background: var(--pre-bg) !important;
   color: var(--pre-ink);
-  box-shadow: var(--shadow);
-  scrollbar-color: var(--rule) var(--pre-bg);
+  scrollbar-color: var(--surface-dark-elevated) var(--surface-dark);
   scrollbar-width: thin;
 }
 
@@ -652,18 +653,19 @@ onBeforeUnmount(() => {
 }
 
 .markdown-body :deep(pre::-webkit-scrollbar-track) {
-  background: var(--pre-bg);
+  background: var(--surface-dark);
 }
 
 .markdown-body :deep(pre::-webkit-scrollbar-thumb) {
-  border: 3px solid var(--pre-bg);
+  border: 3px solid var(--surface-dark);
   border-radius: 999px;
-  background: var(--rule-strong);
+  background: var(--surface-dark-elevated);
 }
 
 .markdown-body :deep(pre code) {
   padding: 0;
   background: transparent;
+  border: 0;
   color: var(--pre-ink);
   font-size: 14px;
   line-height: 1.7;

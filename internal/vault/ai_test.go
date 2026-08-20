@@ -142,3 +142,113 @@ func TestAIChatValidatesLockedAndConfigured(t *testing.T) {
 		t.Fatalf("AIChat() error = %v, want ErrAINotConfigured", err)
 	}
 }
+
+func TestModelListPrecedence(t *testing.T) {
+	// ai.models 数组优先于旧格式单值 ai.model。
+	cfg := AIConfig{Model: "legacy", Models: []string{"m1", "m2"}}
+	got := modelList(cfg)
+	if len(got) != 2 || got[0] != "m1" || got[1] != "m2" {
+		t.Fatalf("modelList() = %v, want [m1 m2]", got)
+	}
+
+	// 旧格式单值回退。
+	if got := modelList(AIConfig{Model: "legacy"}); len(got) != 1 || got[0] != "legacy" {
+		t.Fatalf("modelList() = %v, want [legacy]", got)
+	}
+
+	// 都未配置返回 nil。
+	if got := modelList(AIConfig{}); got != nil {
+		t.Fatalf("modelList() = %v, want nil", got)
+	}
+}
+
+func TestResolveAIModel(t *testing.T) {
+	models := []string{"a", "b", "c"}
+
+	// 空请求取列表首个。
+	model, err := resolveAIModel("", models)
+	if err != nil || model != "a" {
+		t.Fatalf("resolveAIModel(\"\") = %q, %v; want \"a\", nil", model, err)
+	}
+
+	// 命中列表原样返回。
+	if model, err := resolveAIModel("b", models); err != nil || model != "b" {
+		t.Fatalf("resolveAIModel(\"b\") = %q, %v; want \"b\", nil", model, err)
+	}
+
+	// 未知模型报错。
+	if _, err := resolveAIModel("nope", models); err == nil {
+		t.Fatal("resolveAIModel(\"nope\") error = nil, want error")
+	}
+
+	// 空列表 + 空请求报错。
+	if _, err := resolveAIModel("", nil); err == nil {
+		t.Fatal("resolveAIModel(\"\", nil) error = nil, want error")
+	}
+}
+
+func TestGetAIInfoModels(t *testing.T) {
+	// 多模型配置：可用，返回全列表与默认首个。
+	service := NewService(EncryptedVault{
+		AIConfig: AIConfig{
+			Endpoint: "https://example.com/v1/chat/completions",
+			ApiKey:   "sk-test",
+			Models:   []string{"m1", "m2"},
+		},
+	})
+	info, err := service.GetAIInfo()
+	if err != nil {
+		t.Fatalf("GetAIInfo() error = %v", err)
+	}
+	if !info.Available {
+		t.Fatal("GetAIInfo().Available = false, want true")
+	}
+	if info.Model != "m1" || len(info.Models) != 2 || info.Models[1] != "m2" {
+		t.Fatalf("GetAIInfo() = %#v, want model m1 with 2 models", info)
+	}
+
+	// 旧单值配置回退为单元素列表。
+	service = NewService(EncryptedVault{
+		AIConfig: AIConfig{Endpoint: "e", ApiKey: "k", Model: "legacy"},
+	})
+	info, err = service.GetAIInfo()
+	if err != nil {
+		t.Fatalf("GetAIInfo() error = %v", err)
+	}
+	if !info.Available || info.Model != "legacy" || len(info.Models) != 1 {
+		t.Fatalf("GetAIInfo() = %#v, want single legacy model", info)
+	}
+
+	// 缺凭证不可用（models 已配但 endpoint/apiKey 为空）。
+	service = NewService(EncryptedVault{AIConfig: AIConfig{Models: []string{"m"}}})
+	info, err = service.GetAIInfo()
+	if err != nil {
+		t.Fatalf("GetAIInfo() error = %v", err)
+	}
+	if info.Available {
+		t.Fatal("GetAIInfo().Available = true, want false (missing endpoint/apiKey)")
+	}
+}
+
+func TestAIChatRejectsModelNotInList(t *testing.T) {
+	service := testService(t)
+	service.aiConfig = AIConfig{
+		Endpoint: "https://example.com/v1/chat/completions",
+		ApiKey:   "sk-test",
+		Models:   []string{"m1", "m2"},
+	}
+	if _, err := service.Unlock("correct-password"); err != nil {
+		t.Fatalf("Unlock() error = %v", err)
+	}
+
+	// 模型不在配置列表：在校验阶段直接返回错误，不发起网络请求。
+	err := service.AIChat(AIChatRequest{
+		RequestID:  1,
+		DocumentID: "intro",
+		Question:   "q",
+		Model:      "not-configured",
+	})
+	if err == nil || !strings.Contains(err.Error(), "not-configured") {
+		t.Fatalf("AIChat() error = %v, want model-not-configured error", err)
+	}
+}
