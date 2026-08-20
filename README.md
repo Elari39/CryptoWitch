@@ -165,7 +165,25 @@ ai:
 Get-NetAdapter | Select-Object Name, MacAddress
 ```
 
-> 注意：`access.yaml` 含明文密码，仅本地维护，不要提交到仓库、脚本或命令历史。`config.yaml` 仍为可提交的构建期 KDF 配置，与访问密钥分离。
+> 注意：`access.yaml` 含明文密码，仅本地维护，不要提交到仓库、脚本或命令历史。
+
+### `config.yaml`（构建期 vault 配置，可提交）
+
+```yaml
+vault:
+  kdf:
+    time: 3
+    memory: 65536
+    threads: 4
+    keyLen: 32
+  # 是否允许文档中的远程图片（http/https）被加载，默认 false。
+  allowRemoteImages: false
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `vault.kdf.*` | Argon2id 派生参数，修改后需重新执行 `go run ./cmd/packdocs`。 |
+| `vault.allowRemoteImages` | `false`（默认）：文档中的远程图片会被浏览器拦截并显示「图片无法加载」占位，避免打开文档时向图源泄露 IP 与阅读行为；`true`：文档引用的在线图片可正常加载（会向图源暴露访问行为）。 |
 
 ## 内容打包
 
@@ -320,12 +338,20 @@ CryptoWitch 提供的是本地资料包的防护增强，**不是 DRM，也不�
 - 加密后的 `generated.go` 会被编译进 exe，分发前应确认使用的是正确文档和正确密码重新生成的 vault。
 - **划词 AI 解读会突破纯本地边界**：划选的文档片段会发送到 `access.yaml` 中配置的 LLM `endpoint`，请仅在受信任的 AI 服务下使用。对话上下文与历史仅保存在解锁会话内存中，锁定或关闭后清空，不落盘。
 - `access.yaml` 的 `ai.apiKey` 是明文凭证，构建期编译进 exe；与构建密码一样仅本地维护，不要提交仓库、脚本或命令历史。
+- **Markdown 链接协议消毒**：渲染时仅保留 `http/https`、`mailto` 与相对路径链接，`javascript:`、`data:`、`vbscript:` 等协议会被清除，降低恶意文档触发 XSS 的风险。
+- **CSP 纵深防御**：生产构建会为页面注入 Content-Security-Policy（`script-src 'self'`、`connect-src 'self'`、`object-src 'none'` 等），即使文档中出现恶意内容也无法向外部服务发送数据或执行内联脚本之外的动作。
+- **远程图片默认禁止**：`config.yaml` 的 `vault.allowRemoteImages` 默认 `false`，文档中的外链图片不会加载，避免打开文档时向图源泄露 IP 与阅读行为；确需在线图片时再显式开启。
+- **AI 请求有长度上限**：划选片段最多取前 4000 字符，多轮追问仅携带最近 12 条历史消息；划选片段只随首轮提问发送一次，避免重复计费。
 
 ## 常见问题
 
 ### 修改文档后为什么 exe 内容没有变化？
 
 更新 `content/plain` 后必须重新执行 `go run ./cmd/packdocs`，随后再重新构建前端和 Windows exe。
+
+### 打包时遇到空文件怎么办？
+
+`cmd/packdocs` 会跳过 0 字节的 `.md` / `.pdf` 文件并在 stderr 打印 `warning: skip empty file`，不会影响其余文档的打包。若所有文档都为空，打包会失败并提示没有受支持的文档。
 
 ### 运行时密码应该填什么？
 

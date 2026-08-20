@@ -19,10 +19,7 @@ import (
 
 const defaultAccessPath = "access.yaml"
 
-type appConfig struct {
-	App struct {
-		Title string `yaml:"title"`
-	} `yaml:"app"`
+type vaultConfig struct {
 	Vault struct {
 		KDF struct {
 			Time    uint32 `yaml:"time"`
@@ -30,12 +27,14 @@ type appConfig struct {
 			Threads uint8  `yaml:"threads"`
 			KeyLen  uint32 `yaml:"keyLen"`
 		} `yaml:"kdf"`
+		// AllowRemoteImages 是否允许文档中的远程图片（http/https）被加载，默认 false。
+		AllowRemoteImages bool `yaml:"allowRemoteImages"`
 	} `yaml:"vault"`
 }
 
 type accessConfig struct {
-	Password    string   `yaml:"password"`
-	AllowedMACs []string `yaml:"allowedMACs"`
+	Password    string         `yaml:"password"`
+	AllowedMACs []string       `yaml:"allowedMACs"`
 	AI          aiAccessConfig `yaml:"ai"`
 }
 
@@ -88,6 +87,7 @@ func run(configPath, accessPath, contentDir, outputPath string) error {
 		return err
 	}
 	encrypted.AllowedMACs = access.AllowedMACs
+	encrypted.AllowRemoteImages = config.Vault.AllowRemoteImages
 	encrypted.AIConfig = vault.AIConfig{
 		Endpoint: access.AI.Endpoint,
 		ApiKey:   access.AI.ApiKey,
@@ -107,14 +107,14 @@ func run(configPath, accessPath, contentDir, outputPath string) error {
 	return nil
 }
 
-func readConfig(path string) (appConfig, error) {
+func readConfig(path string) (vaultConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return appConfig{}, fmt.Errorf("read config: %w", err)
+		return vaultConfig{}, fmt.Errorf("read config: %w", err)
 	}
-	var config appConfig
+	var config vaultConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		return appConfig{}, fmt.Errorf("parse config: %w", err)
+		return vaultConfig{}, fmt.Errorf("parse config: %w", err)
 	}
 	return config, nil
 }
@@ -144,6 +144,10 @@ func readDocuments(root string) ([]vault.PlainDocument, error) {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("read document %s: %w", path, err)
+		}
+		if len(data) == 0 {
+			fmt.Fprintf(os.Stderr, "warning: skip empty file %s\n", path)
+			return nil
 		}
 		relative, err := filepath.Rel(root, path)
 		if err != nil {
@@ -253,6 +257,7 @@ func renderGeneratedVault(encrypted vault.EncryptedVault) ([]byte, error) {
 		buffer.WriteString(fmt.Sprintf("%q", mac))
 	}
 	buffer.WriteString("},\n")
+	buffer.WriteString(fmt.Sprintf("\tAllowRemoteImages: %t,\n", encrypted.AllowRemoteImages))
 	buffer.WriteString("\tAIConfig: AIConfig{\n")
 	buffer.WriteString(fmt.Sprintf("\t\tEndpoint: %q,\n", encrypted.AIConfig.Endpoint))
 	buffer.WriteString(fmt.Sprintf("\t\tApiKey:   %q,\n", encrypted.AIConfig.ApiKey))

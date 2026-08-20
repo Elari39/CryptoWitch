@@ -15,6 +15,9 @@ type EncryptedVault struct {
 	Documents   []EncryptedDocument `json:"documents"`
 	AllowedMACs []string            `json:"allowedMacs,omitempty"`
 	AIConfig    AIConfig            `json:"aiConfig,omitempty"`
+	// AllowRemoteImages 是否允许文档中的远程图片（http/https）被加载。
+	// 构建期由 config.yaml 的 vault.allowRemoteImages 注入，默认 false（隐私优先）。
+	AllowRemoteImages bool `json:"allowRemoteImages,omitempty"`
 }
 
 // AIConfig 是划词 AI 解读的服务凭证，构建期由 access.yaml 注入并嵌入 generated.go。
@@ -105,10 +108,10 @@ type AIMessage struct {
 
 // AIChatRequest 由前端发起的划词 AI 解读请求。
 type AIChatRequest struct {
-	RequestID    int        `json:"requestId"`
-	DocumentID   string     `json:"documentId"`
-	SelectedText string     `json:"selectedText"`
-	Question     string     `json:"question"`
+	RequestID    int         `json:"requestId"`
+	DocumentID   string      `json:"documentId"`
+	SelectedText string      `json:"selectedText"`
+	Question     string      `json:"question"`
 	History      []AIMessage `json:"history"`
 }
 
@@ -117,4 +120,10 @@ type AIInfo struct {
 	Available bool   `json:"available"`
 	Model     string `json:"model,omitempty"`
 	Endpoint  string `json:"endpoint,omitempty"`
+}
+
+// SecurityPolicy 返回运行时安全策略信息，供宿主（main.go）注入 CSP 使用。
+// 不含任何密钥或文档内容。
+type SecurityPolicy struct {
+	AllowRemoteImages bool `json:"allowRemoteImages"`
 }

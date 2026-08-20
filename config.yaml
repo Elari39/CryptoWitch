@@ -1,8 +1,11 @@
-app:
-  title: CryptoWitch
+# 构建期 vault KDF 配置（可提交，与访问密钥分离）。
 vault:
   kdf:
     time: 3
     memory: 65536
     threads: 4
     keyLen: 32
+  # 是否允许文档中的远程图片（http/https）被加载，默认 false。
+  # false：远程图片被浏览器拦截并显示「图片无法加载」占位，避免打开文档时向图源泄露 IP 与阅读行为。
+  # true：文档中引用的在线图片可以正常加载（会向图源暴露访问行为）。
+  allowRemoteImages: true

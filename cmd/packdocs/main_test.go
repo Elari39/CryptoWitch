@@ -66,6 +66,38 @@ func TestReadDocumentsReturnsEmptyForUnsupportedOnly(t *testing.T) {
 	}
 }
 
+func TestReadDocumentsSkipsEmptyFiles(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "guide/intro.md", "# Intro")
+	writeTestFile(t, root, "guide/empty.md", "")
+	writeTestFile(t, root, "guide/empty.pdf", "")
+
+	documents, err := readDocuments(root)
+	if err != nil {
+		t.Fatalf("readDocuments() error = %v", err)
+	}
+	if len(documents) != 1 {
+		t.Fatalf("len(documents) = %d, want 1 (empty files skipped): %#v", len(documents), documents)
+	}
+	if documents[0].ID == "empty.md" || documents[0].ID == "empty.pdf" {
+		t.Fatalf("empty file should have been skipped: %#v", documents[0])
+	}
+}
+
+func TestReadDocumentsSkipsAllEmptyFiles(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "guide/empty.md", "")
+	writeTestFile(t, root, "guide/empty.pdf", "")
+
+	documents, err := readDocuments(root)
+	if err != nil {
+		t.Fatalf("readDocuments() error = %v", err)
+	}
+	if len(documents) != 0 {
+		t.Fatalf("len(documents) = %d, want 0", len(documents))
+	}
+}
+
 func TestRunErrorsWhenNoSupportedDocumentsFound(t *testing.T) {
 	root := t.TempDir()
 	configPath := writeTestFile(t, root, "config.yaml", "app:\n  title: CryptoWitch\nvault:\n  kdf:\n    time: 1\n")
@@ -98,6 +130,7 @@ func TestRenderGeneratedVaultIncludesPDFChunks(t *testing.T) {
 		t.Fatalf("EncryptVault() error = %v", err)
 	}
 	encrypted.AllowedMACs = []string{"AA:BB:CC:DD:EE:FF", "*"}
+	encrypted.AllowRemoteImages = true
 	generated, err := renderGeneratedVault(encrypted)
 	if err != nil {
 		t.Fatalf("renderGeneratedVault() error = %v", err)
@@ -109,8 +142,11 @@ func TestRenderGeneratedVaultIncludesPDFChunks(t *testing.T) {
 	if !strings.Contains(source, "Chunks: []EncryptedPayload") {
 		t.Fatalf("generated source missing PDF chunks: %s", source)
 	}
-	if !strings.Contains(source, "AllowedMACs: []string{") || !strings.Contains(source, `"*"`) {
+	if !strings.Contains(source, "AllowedMACs:") || !strings.Contains(source, `"*"`) {
 		t.Fatalf("generated source missing AllowedMACs: %s", source)
+	}
+	if !strings.Contains(source, "AllowRemoteImages: true") {
+		t.Fatalf("generated source missing AllowRemoteImages: %s", source)
 	}
 }
 

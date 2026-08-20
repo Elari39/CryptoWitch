@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -343,8 +344,87 @@ func TestGetMarkdownDocumentUsesRenderCache(t *testing.T) {
 	}
 }
 
+func TestHTMLCacheEvictsOldestBeyondLimit(t *testing.T) {
+	service := testService(t)
+
+	if _, err := service.Unlock("correct-password"); err != nil {
+		t.Fatalf("Unlock() error = %v", err)
+	}
+	total := maxHTMLCacheEntries + 8
+	for index := 0; index < total; index++ {
+		service.cacheMarkdownHTML(fmt.Sprintf("doc-%d", index), "<p>html</p>", service.session)
+	}
+	if len(service.htmlCache) != maxHTMLCacheEntries {
+		t.Fatalf("htmlCache len = %d, want %d", len(service.htmlCache), maxHTMLCacheEntries)
+	}
+	if _, exists := service.htmlCache["doc-0"]; exists {
+		t.Fatal("oldest entry doc-0 should have been evicted")
+	}
+	if _, exists := service.htmlCache[fmt.Sprintf("doc-%d", total-1)]; !exists {
+		t.Fatal("newest entry should still be cached")
+	}
+	if len(service.htmlCacheOrder) != maxHTMLCacheEntries {
+		t.Fatalf("htmlCacheOrder len = %d, want %d", len(service.htmlCacheOrder), maxHTMLCacheEntries)
+	}
+}
+
+func TestHTMLCacheUpdateKeepsOrderStable(t *testing.T) {
+	service := testService(t)
+
+	if _, err := service.Unlock("correct-password"); err != nil {
+		t.Fatalf("Unlock() error = %v", err)
+	}
+	service.cacheMarkdownHTML("a", "<p>1</p>", service.session)
+	service.cacheMarkdownHTML("b", "<p>2</p>", service.session)
+	service.cacheMarkdownHTML("a", "<p>updated</p>", service.session)
+	if len(service.htmlCacheOrder) != 2 {
+		t.Fatalf("htmlCacheOrder len = %d, want 2 (update must not re-append)", len(service.htmlCacheOrder))
+	}
+	if service.htmlCache["a"] != "<p>updated</p>" {
+		t.Fatalf("htmlCache[a] = %q, want updated value", service.htmlCache["a"])
+	}
+}
+
+func TestGetSecurityPolicy(t *testing.T) {
+	encrypted, err := EncryptVault(PlainVault{
+		Documents: []PlainDocument{
+			{
+				DocumentMetadata: DocumentMetadata{
+					ID:           "intro",
+					Title:        "Intro",
+					Path:         "intro.md",
+					DocumentType: "markdown",
+					MimeType:     "text/markdown; charset=utf-8",
+					Size:         int64(len("# Intro")),
+				},
+				Content: []byte("# Intro"),
+			},
+		},
+	}, "correct-password", KDFParams{Time: 1, Memory: 64 * 1024, Threads: 1, KeyLen: 32})
+	if err != nil {
+		t.Fatalf("EncryptVault() error = %v", err)
+	}
+	encrypted.AllowRemoteImages = true
+	service := NewService(encrypted)
+
+	policy, err := service.GetSecurityPolicy()
+	if err != nil {
+		t.Fatalf("GetSecurityPolicy() error = %v", err)
+	}
+	if !policy.AllowRemoteImages {
+		t.Fatal("AllowRemoteImages = false, want true")
+	}
+	service.Lock()
+	if policy, err = service.GetSecurityPolicy(); err != nil {
+		t.Fatalf("GetSecurityPolicy() after lock error = %v", err)
+	}
+	if !policy.AllowRemoteImages {
+		t.Fatal("AllowRemoteImages = false after lock, want unchanged")
+	}
+}
+
 func TestRenderMarkdownDoesNotAllowRawHTML(t *testing.T) {
-	html, err := RenderMarkdown("# Title\n\n<script>alert('x')</script>")
+	html, err := RenderMarkdown("# Title\n\n<script>alert('x')</script>", false)
 	if err != nil {
 		t.Fatalf("RenderMarkdown() error = %v", err)
 	}
@@ -357,7 +437,7 @@ func TestRenderMarkdownDoesNotAllowRawHTML(t *testing.T) {
 }
 
 func TestRenderMarkdownHighlightsFencedCode(t *testing.T) {
-	html, err := RenderMarkdown("```go\nfmt.Println(\"hi\")\n```")
+	html, err := RenderMarkdown("```go\nfmt.Println(\"hi\")\n```", false)
 	if err != nil {
 		t.Fatalf("RenderMarkdown() error = %v", err)
 	}
@@ -373,7 +453,7 @@ func TestRenderMarkdownHighlightsFencedCode(t *testing.T) {
 }
 
 func TestRenderMarkdownKeepsUnknownLanguageCode(t *testing.T) {
-	html, err := RenderMarkdown("```not-a-real-language\n<token>\n```")
+	html, err := RenderMarkdown("```not-a-real-language\n<token>\n```", false)
 	if err != nil {
 		t.Fatalf("RenderMarkdown() error = %v", err)
 	}

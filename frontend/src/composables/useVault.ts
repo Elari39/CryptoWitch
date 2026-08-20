@@ -93,21 +93,29 @@ export function useVault() {
       totalBytes: document.size,
     }
 
-    for (let index = 0; index < totalChunks; index += 1) {
-      const chunk = await VaultService.GetPDFChunk(document.id, index)
-      if (requestID !== documentRequestID) {
-        return
+    try {
+      for (let index = 0; index < totalChunks; index += 1) {
+        const chunk = await VaultService.GetPDFChunk(document.id, index)
+        if (requestID !== documentRequestID) {
+          return
+        }
+        const bytes = base64ToBytes(chunk.contentBase64)
+        parts.push(bytes)
+        loadedBytes += bytes.byteLength
+        pdfLoad.value = {
+          url: '',
+          loadedChunks: index + 1,
+          totalChunks,
+          loadedBytes,
+          totalBytes: document.size,
+        }
       }
-      const bytes = base64ToBytes(chunk.contentBase64)
-      parts.push(bytes)
-      loadedBytes += bytes.byteLength
-      pdfLoad.value = {
-        url: '',
-        loadedChunks: index + 1,
-        totalChunks,
-        loadedBytes,
-        totalBytes: document.size,
+    } catch (caught) {
+      // 任一分块拉取失败时先复位加载状态，避免界面停留在「正在加载 PDF x%」。
+      if (requestID === documentRequestID) {
+        resetPDFLoad()
       }
+      throw caught
     }
 
     if (requestID === documentRequestID) {
@@ -183,6 +191,8 @@ export function useVault() {
       }
     } catch (caught) {
       if (requestID === documentRequestID) {
+        // 兜底复位：任何加载路径失败都不应残留半加载的 PDF 状态。
+        resetPDFLoad()
         error.value = normalizeError(caught)
       }
     } finally {

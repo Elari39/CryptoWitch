@@ -183,6 +183,31 @@ export class PDFChunkResponse {
     }
 }
 
+/**
+ * SecurityPolicy 返回运行时安全策略信息，供宿主（main.go）注入 CSP 使用。
+ * 不含任何密钥或文档内容。
+ */
+export class SecurityPolicy {
+    "allowRemoteImages": boolean;
+
+    /** Creates a new SecurityPolicy instance. */
+    constructor($$source: Partial<SecurityPolicy> = {}) {
+        if (!("allowRemoteImages" in $$source)) {
+            this["allowRemoteImages"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SecurityPolicy instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SecurityPolicy {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SecurityPolicy($$parsedSource as Partial<SecurityPolicy>);
+    }
+}
+
 export class TreeNode {
     "id"?: string;
     "title": string;

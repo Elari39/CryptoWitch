@@ -17,6 +17,15 @@ import (
 
 const aiSystemPrompt = "你是一位严谨的文档解读助手。用户会从一篇文档中划选一段原文并提问，请基于该片段作答；若片段信息不足以回答，请明确指出，不要编造。回答使用中文，简洁清晰。"
 
+// AI 请求的 token 控制上限：
+//   - 划选片段最多保留前 4000 个字符（按 rune 计），避免超长划选浪费 token；
+//   - 多轮追问时只携带最近 12 条历史消息（约 6 轮问答）。
+const (
+	aiMaxSelectedTextRunes = 4000
+	aiMaxHistoryMessages   = 12
+	aiSelectedTextPrefix   = "以下是文档划选片段："
+)
+
 // aiEventChunk / aiEventDone / aiEventError 是推送给前端的事件名。
 const (
 	aiEventChunk = "ai:chunk"
@@ -31,9 +40,9 @@ type openAIMessage struct {
 }
 
 type openAIStreamRequest struct {
-	Model    string           `json:"model"`
-	Stream   bool             `json:"stream"`
-	Messages []openAIMessage  `json:"messages"`
+	Model    string          `json:"model"`
+	Stream   bool            `json:"stream"`
+	Messages []openAIMessage `json:"messages"`
 }
 
 type openAIStreamChoice struct {
@@ -71,8 +80,13 @@ func (s *Service) AIChat(req AIChatRequest) error {
 	}
 	cfg := s.aiConfig
 	session := s.session
+	_, documentExists := s.documents[req.DocumentID]
 	s.mu.RUnlock()
 
+	// 仅校验文档存在性（划选片段本身无法可靠验证归属）。
+	if req.DocumentID != "" && !documentExists {
+		return ErrDocumentNotFound
+	}
 	if cfg.Endpoint == "" || cfg.ApiKey == "" || cfg.Model == "" {
 		return ErrAINotConfigured
 	}
@@ -177,15 +191,25 @@ func (s *Service) emitAI(eventName string, requestID int, session uint64, data s
 }
 
 // buildAIMessages 把系统提示、划选片段、历史对话与当前问题组装成 OpenAI messages。
+// 划选片段只注入一次：若历史首条已携带片段（多轮追问），不再重复发送；
+// 片段超过 aiMaxSelectedTextRunes 时截断，历史仅保留最近 aiMaxHistoryMessages 条。
 func buildAIMessages(req AIChatRequest) []openAIMessage {
 	messages := []openAIMessage{{Role: "system", Content: aiSystemPrompt}}
-	if strings.TrimSpace(req.SelectedText) != "" {
+	selected := strings.TrimSpace(req.SelectedText)
+	if selected != "" && !historyAlreadyHasSelection(req.History) {
+		if runes := []rune(selected); len(runes) > aiMaxSelectedTextRunes {
+			selected = string(runes[:aiMaxSelectedTextRunes])
+		}
 		messages = append(messages, openAIMessage{
-			Role: "user",
-			Content: "以下是文档划选片段：\n\n" + req.SelectedText + "\n\n请基于此片段回答我接下来的问题。",
+			Role:    "user",
+			Content: aiSelectedTextPrefix + "\n\n" + selected + "\n\n请基于此片段回答我接下来的问题。",
 		})
 	}
-	for _, msg := range req.History {
+	history := req.History
+	if len(history) > aiMaxHistoryMessages {
+		history = history[len(history)-aiMaxHistoryMessages:]
+	}
+	for _, msg := range history {
 		role := msg.Role
 		if role != "user" && role != "assistant" {
 			continue
@@ -202,4 +226,14 @@ func buildAIMessages(req AIChatRequest) []openAIMessage {
 	}
 	messages = append(messages, openAIMessage{Role: "user", Content: question})
 	return messages
+}
+
+// historyAlreadyHasSelection 判断历史首条是否已携带划选片段
+// （首条 user 消息以固定前缀开头），避免多轮追问重复发送同一片段。
+func historyAlreadyHasSelection(history []AIMessage) bool {
+	if len(history) == 0 {
+		return false
+	}
+	first := history[0]
+	return first.Role == "user" && strings.HasPrefix(strings.TrimSpace(first.Content), aiSelectedTextPrefix)
 }

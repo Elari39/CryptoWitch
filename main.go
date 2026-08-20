@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"embed"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"strings"
 
 	"cryptowitch/internal/vault"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -16,9 +21,6 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-// main function serves as the application's entry point. It initializes the application, creates a window,
-// and starts a goroutine that emits a time-based event every second. It subsequently runs the application and
-// logs any error that might occur.
 func main() {
 	vaultService := vault.NewService(vault.EmbeddedVault)
 
@@ -34,7 +36,7 @@ func main() {
 			application.NewService(vaultService),
 		},
 		Assets: application.AssetOptions{
-			Handler: application.AssetFileServerFS(assets),
+			Handler: cspAssetHandler(assets, vaultService),
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
@@ -78,3 +80,104 @@ func main() {
 		log.Fatal(err)
 	}
 }
+
+// cspPolicy 生成 Content-Security-Policy 内容。
+// - script-src/style-src 保留 'unsafe-inline'：兼容 Wails runtime 注入与 KaTeX / goldmark 高亮的内联样式；
+// - connect-src 'self' 封死页面内 XSS 外联（Wails IPC 为同源 fetch，不受影响）；
+// - frame-src blob: 放行 PDF 分块查看器 iframe；
+// - img-src 默认仅同源/data/blob，allowRemoteImages 开启时追加 http/https。
+func cspPolicy(allowRemoteImages bool) string {
+	imgSrc := "img-src 'self' data: blob:"
+	if allowRemoteImages {
+		imgSrc = "img-src 'self' data: blob: https: http:"
+	}
+	return strings.Join([]string{
+		"default-src 'self'",
+		"script-src 'self' 'unsafe-inline'",
+		"style-src 'self' 'unsafe-inline'",
+		imgSrc,
+		"font-src 'self' data:",
+		"frame-src blob:",
+		"connect-src 'self'",
+		"object-src 'none'",
+		"base-uri 'none'",
+		"form-action 'none'",
+	}, "; ")
+}
+
+// cspAssetHandler 包装 Wails 静态资源服务：对 text/html 响应在 </head> 前注入
+// Content-Security-Policy meta，作为 XSS 的防御纵深。其余资源原样透传。
+// dev 模式页面由 Vite dev server 提供，不经过此 handler，因此 CSP 仅在生产构建生效。
+func cspAssetHandler(assets embed.FS, vaultService *vault.Service) http.Handler {
+	base := application.AssetFileServerFS(assets)
+	policy, err := vaultService.GetSecurityPolicy()
+	if err != nil {
+		log.Printf("warn: get security policy: %v", err)
+	}
+	meta := []byte(fmt.Sprintf(
+		`<meta http-equiv="Content-Security-Policy" content="%s">`,
+		cspPolicy(policy.AllowRemoteImages),
+	))
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		buffered := &bufferedResponseWriter{header: make(http.Header)}
+		base.ServeHTTP(buffered, r)
+
+		body := buffered.body.Bytes()
+		if buffered.status == 0 {
+			buffered.status = http.StatusOK
+		}
+		// 仅对完整（非 206 分段）的 HTML 响应注入；注入后 Content-Length 失效，需移除。
+		if buffered.status == http.StatusOK && strings.Contains(buffered.header.Get("Content-Type"), "text/html") {
+			if injected := injectCSPMeta(body, meta); injected != nil {
+				body = injected
+				buffered.header.Del("Content-Length")
+			}
+		}
+
+		header := w.Header()
+		for key, values := range buffered.header {
+			header[key] = values
+		}
+		w.WriteHeader(buffered.status)
+		_, _ = w.Write(body)
+	})
+}
+
+// injectCSPMeta 在 </head> 前插入 CSP meta；找不到 </head> 时返回 nil（不注入）。
+func injectCSPMeta(html []byte, meta []byte) []byte {
+	index := bytes.LastIndex(bytes.ToLower(html), []byte("</head>"))
+	if index < 0 {
+		return nil
+	}
+	headEnd := index + len("</head>")
+	injected := make([]byte, 0, len(html)+len(meta)+1)
+	injected = append(injected, html[:index]...)
+	injected = append(injected, meta...)
+	injected = append(injected, html[index:headEnd]...)
+	injected = append(injected, html[headEnd:]...)
+	return injected
+}
+
+// bufferedResponseWriter 缓冲完整响应体，供上层在写回前改写。
+type bufferedResponseWriter struct {
+	header http.Header
+	status int
+	body   bytes.Buffer
+}
+
+func (b *bufferedResponseWriter) Header() http.Header {
+	return b.header
+}
+
+func (b *bufferedResponseWriter) WriteHeader(status int) {
+	if b.status == 0 {
+		b.status = status
+	}
+}
+
+func (b *bufferedResponseWriter) Write(p []byte) (int, error) {
+	return b.body.Write(p)
+}
+
+var _ io.Writer = (*bufferedResponseWriter)(nil)

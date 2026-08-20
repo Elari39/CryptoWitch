@@ -16,29 +16,36 @@ var (
 	ErrAINotConfigured     = errors.New("ai is not configured")
 )
 
+// maxHTMLCacheEntries 限制解锁会话内 Markdown 渲染结果缓存条数，
+// 避免大 vault 全部打开后 HTML 缓存无限增长。
+const maxHTMLCacheEntries = 32
+
 type Service struct {
-	mu          sync.RWMutex
-	encrypted   EncryptedVault
-	unlocked    bool
-	session     uint64
-	aead        cipher.AEAD
-	version     int
-	documents   map[string]DocumentMetadata
-	payloads    map[string]EncryptedDocument
-	htmlCache   map[string]string
-	tree        []TreeNode
-	allowedMACs []string
-	aiConfig    AIConfig
+	mu                sync.RWMutex
+	encrypted         EncryptedVault
+	unlocked          bool
+	session           uint64
+	aead              cipher.AEAD
+	version           int
+	documents         map[string]DocumentMetadata
+	payloads          map[string]EncryptedDocument
+	htmlCache         map[string]string
+	htmlCacheOrder    []string
+	tree              []TreeNode
+	allowedMACs       []string
+	aiConfig          AIConfig
+	allowRemoteImages bool
 }
 
 func NewService(encrypted EncryptedVault) *Service {
 	return &Service{
-		encrypted:   encrypted,
-		allowedMACs: encrypted.AllowedMACs,
-		aiConfig:    encrypted.AIConfig,
-		documents:   make(map[string]DocumentMetadata),
-		payloads:    make(map[string]EncryptedDocument),
-		htmlCache:   make(map[string]string),
+		encrypted:         encrypted,
+		allowedMACs:       encrypted.AllowedMACs,
+		aiConfig:          encrypted.AIConfig,
+		allowRemoteImages: encrypted.AllowRemoteImages,
+		documents:         make(map[string]DocumentMetadata),
+		payloads:          make(map[string]EncryptedDocument),
+		htmlCache:         make(map[string]string),
 	}
 }
 
@@ -68,6 +75,7 @@ func (s *Service) Unlock(password string) (UnlockResponse, error) {
 	s.documents = documents
 	s.payloads = payloads
 	s.htmlCache = make(map[string]string)
+	s.htmlCacheOrder = nil
 	s.tree = tree
 	s.unlocked = true
 	s.session++
@@ -89,6 +97,7 @@ func (s *Service) clearUnlockedState() {
 	s.documents = make(map[string]DocumentMetadata)
 	s.payloads = make(map[string]EncryptedDocument)
 	s.htmlCache = make(map[string]string)
+	s.htmlCacheOrder = nil
 	s.tree = nil
 }
 
@@ -132,7 +141,7 @@ func (s *Service) GetDocument(id string) (DocumentResponse, error) {
 			if err != nil {
 				return DocumentResponse{}, ErrInvalidPassword
 			}
-			rendered, err := RenderMarkdown(string(content))
+			rendered, err := RenderMarkdown(string(content), s.allowRemoteImages)
 			zeroBytes(content)
 			if err != nil {
 				return DocumentResponse{}, err
@@ -209,8 +218,20 @@ func (s *Service) GetPDFChunk(id string, index int) (PDFChunkResponse, error) {
 func (s *Service) cacheMarkdownHTML(id string, html string, session uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.unlocked && s.session == session {
+	if !s.unlocked || s.session != session {
+		return
+	}
+	if _, exists := s.htmlCache[id]; exists {
 		s.htmlCache[id] = html
+		return
+	}
+	s.htmlCache[id] = html
+	s.htmlCacheOrder = append(s.htmlCacheOrder, id)
+	// 超过上限时按插入顺序淘汰最旧条目，防止会话内缓存无限增长。
+	if len(s.htmlCacheOrder) > maxHTMLCacheEntries {
+		evicted := s.htmlCacheOrder[0]
+		s.htmlCacheOrder = s.htmlCacheOrder[1:]
+		delete(s.htmlCache, evicted)
 	}
 }
 
@@ -218,6 +239,14 @@ func (s *Service) isCurrentSession(session uint64) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.unlocked && s.session == session
+}
+
+// GetSecurityPolicy 返回运行时安全策略信息（不含任何密钥或文档内容），
+// 供宿主（main.go）注入 Content-Security-Policy 使用。
+func (s *Service) GetSecurityPolicy() (SecurityPolicy, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return SecurityPolicy{AllowRemoteImages: s.allowRemoteImages}, nil
 }
 
 func cloneTree(nodes []TreeNode) []TreeNode {

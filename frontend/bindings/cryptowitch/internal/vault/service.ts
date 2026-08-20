@@ -38,9 +38,19 @@ export function GetPDFChunk(id: string, index: number): $CancellablePromise<$mod
     });
 }
 
+/**
+ * GetSecurityPolicy 返回运行时安全策略信息（不含任何密钥或文档内容），
+ * 供宿主（main.go）注入 Content-Security-Policy 使用。
+ */
+export function GetSecurityPolicy(): $CancellablePromise<$models.SecurityPolicy> {
+    return $Call.ByID(2359656741).then(($result: any) => {
+        return $$createType3($result);
+    });
+}
+
 export function GetTree(): $CancellablePromise<$models.TreeNode[]> {
     return $Call.ByID(2630704765).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType5($result);
     });
 }
 
@@ -50,7 +60,7 @@ export function Lock(): $CancellablePromise<void> {
 
 export function Unlock(password: string): $CancellablePromise<$models.UnlockResponse> {
     return $Call.ByID(2110480459, password).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType6($result);
     });
 }
 
@@ -58,6 +68,7 @@ export function Unlock(password: string): $CancellablePromise<$models.UnlockResp
 const $$createType0 = $models.AIInfo.createFrom;
 const $$createType1 = $models.DocumentResponse.createFrom;
 const $$createType2 = $models.PDFChunkResponse.createFrom;
-const $$createType3 = $models.TreeNode.createFrom;
-const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = $models.UnlockResponse.createFrom;
+const $$createType3 = $models.SecurityPolicy.createFrom;
+const $$createType4 = $models.TreeNode.createFrom;
+const $$createType5 = $Create.Array($$createType4);
+const $$createType6 = $models.UnlockResponse.createFrom;

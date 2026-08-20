@@ -12,6 +12,7 @@ export {
     AIMessage,
     DocumentResponse,
     PDFChunkResponse,
+    SecurityPolicy,
     TreeNode,
     UnlockResponse
 } from "./models.js";
