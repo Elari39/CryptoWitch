@@ -31,6 +31,9 @@ tmp/
 temp/
 .tmp/
 
+# Project-unrelated design/scratch documents
+DESIGN.md
+
 # Go build/test artifacts
 /cryptowitch
 /cryptowitch.exe
