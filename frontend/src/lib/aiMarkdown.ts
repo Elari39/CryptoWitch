@@ -150,8 +150,10 @@ marked.use({
  * 白名单消毒：危险标签整体移除；img 替换为 alt 文本（隐私优先，不加载远程图片）；
  * a 链接仅保留合法协议，其余解包为纯文本；
  * 其余标签仅放行 class 属性（hljs 高亮与代码窗依赖），剥离其余全部属性（防 on* / style / data-* 注入）。
+ *
+ * 导出供单元测试直接覆盖（XSS 关键路径，见 aiMarkdown.test.ts）。
  */
-function sanitizeHTML(html: string): string {
+export function sanitizeHTML(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const root = doc.body
 
