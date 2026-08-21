@@ -2,12 +2,19 @@
 password: "change-this-password"
 # 允许查看文档的网卡 MAC 白名单，命中任一即放行。
 # 设为 "*" 时跳过 MAC 校验，仅凭密码即可查看。
+# 注意：白名单以明文编译进 exe，非机密——可被静态提取获知目标 MAC，
+# 且网卡 MAC 可被伪造绕过，仅为访问增强而非 DRM。
 allowedMACs:
   - "AA:BB:CC:DD:EE:FF"
   # - "*"
 # 划词 AI 解读服务凭证（OpenAI 兼容 /chat/completions 接口）。
 # 构建期注入并编译进 exe；仅本地维护，不要提交到仓库。
 # 留空整段或字段时，运行时划词 AI 功能不可用。
+#
+# ⚠️ 安全须知：ai.apiKey 与 endpoint 以明文编译进 exe，不受 vault 密码保护——
+# 分发出去的 exe 可被 strings/binwalk 等静态分析工具直接提取，攻击者无需解锁即可
+# 绕过应用直连 AI 后端。请勿在此嵌入高价值、长期有效的 AI 凭证；如需真正门控，
+# 应改为运行时由用户输入或从可信服务换取（见 README 安全说明）。
 ai:
   endpoint: "https://example.com/v1/chat/completions"
   apiKey: "sk-your-api-key"
