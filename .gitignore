@@ -46,6 +46,9 @@ temp/
 # Project-unrelated design/scratch documents
 DESIGN.md
 
+# Code review report (local, not tracked)
+/审查报告.md
+
 # Go build/test artifacts
 /cryptowitch
 /cryptowitch.exe
