@@ -155,14 +155,23 @@ func (s *Service) AIChat(req AIChatRequest) error {
 		return fmt.Errorf("encode ai request: %w", err)
 	}
 
-	// 在后台完成流式读取，事件驱动前端更新。
-	go s.streamAIChat(cfg, body, req.RequestID, session)
+	// 在后台完成流式读取，事件驱动前端更新。totalCtx 由 AIChat 创建并登记 cancel，
+	// 以便 Lock/clearUnlockedState 取消进行中的流式请求，避免 goroutine 挂起至总超时。
+	totalCtx, cancel := context.WithTimeout(context.Background(), aiMaxStreamTimeout)
+	s.mu.Lock()
+	// 取消上一条仍在进行的流式请求（防御性；前端 streaming 标志通常已阻止并发）。
+	if s.aiCancel != nil {
+		s.aiCancel()
+	}
+	s.aiCancel = cancel
+	s.mu.Unlock()
+	go s.streamAIChat(cfg, body, req.RequestID, session, totalCtx, cancel)
 	return nil
 }
 
-func (s *Service) streamAIChat(cfg AIConfig, body []byte, requestID int, session uint64) {
-	// 总时长上限：请求与流式读取共用此上下文，到期后 net/http 会中断底层连接。
-	totalCtx, cancel := context.WithTimeout(context.Background(), aiMaxStreamTimeout)
+func (s *Service) streamAIChat(cfg AIConfig, body []byte, requestID int, session uint64, totalCtx context.Context, cancel context.CancelFunc) {
+	// totalCtx 由 AIChat 创建（含 aiMaxStreamTimeout 总时长上限）；cancel 已登记到
+	// s.aiCancel，Lock 时会调用以中断进行中的流式读取。defer 兑底释放定时器资源。
 	defer cancel()
 
 	request, err := http.NewRequestWithContext(totalCtx, http.MethodPost, cfg.Endpoint, bytes.NewReader(body))

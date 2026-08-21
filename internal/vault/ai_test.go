@@ -2,8 +2,12 @@ package vault
 
 import (
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBuildAIMessagesTruncatesSelectedText(t *testing.T) {
@@ -271,4 +275,59 @@ func TestAIChatRejectsModelNotInList(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "not-configured") {
 		t.Fatalf("AIChat() error = %v, want model-not-configured error", err)
 	}
+}
+
+// TestLockCancelsInflightAIStream 验证锁定会取消进行中的 AI 流式请求，
+// 避免 goroutine 挂起至 30 分钟总超时（M2）。
+func TestLockCancelsInflightAIStream(t *testing.T) {
+	received := make(chan struct{})
+	ctxDone := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 必须先消费请求体：带 body 的请求被客户端 cancel 时，
+		// net/http 只有在 body 已被服务端读取后才会关闭连接，
+		// 否则 r.Context().Done() 不会触发（真实 AI 服务端总会读取请求体）。
+		io.Copy(io.Discard, r.Body)
+		close(received)
+		<-r.Context().Done()
+		close(ctxDone)
+	}))
+	defer server.Close()
+
+	service := testService(t)
+	service.aiConfig = AIConfig{
+		Endpoint: server.URL,
+		ApiKey:   "sk-test",
+		Models:   []string{"m"},
+	}
+	if _, err := service.Unlock("correct-password"); err != nil {
+		t.Fatalf("Unlock() error = %v", err)
+	}
+
+	if err := service.AIChat(AIChatRequest{
+		RequestID:  1,
+		DocumentID: "intro",
+		Question:   "q",
+	}); err != nil {
+		t.Fatalf("AIChat() error = %v", err)
+	}
+
+	select {
+	case <-received:
+	case <-time.After(3 * time.Second):
+		t.Fatal("AI request never reached test server")
+	}
+
+	service.Lock()
+
+	select {
+	case <-ctxDone:
+	case <-time.After(3 * time.Second):
+		t.Fatal("in-flight AI request context was not canceled after Lock")
+	}
+
+	service.mu.Lock()
+	if service.aiCancel != nil {
+		t.Fatal("aiCancel should be cleared after Lock")
+	}
+	service.mu.Unlock()
 }

@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"crypto/cipher"
 	"encoding/base64"
 	"errors"
@@ -49,6 +50,7 @@ type Service struct {
 	allowedMACs         []string
 	aiConfig            AIConfig
 	allowRemoteImages   bool
+	aiCancel            context.CancelFunc
 	unlockFailures      int
 	unlockCooldownUntil time.Time
 }
@@ -112,6 +114,11 @@ func (s *Service) Lock() {
 func (s *Service) clearUnlockedState() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// 取消进行中的 AI 流式请求，避免 goroutine 在锁定后仍挂起至总超时。
+	if s.aiCancel != nil {
+		s.aiCancel()
+		s.aiCancel = nil
+	}
 	s.unlocked = false
 	s.session++
 	s.aead = nil
