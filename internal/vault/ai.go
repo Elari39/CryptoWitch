@@ -34,7 +34,10 @@ const (
 //   - 首字 60 秒：从发起请求到收到响应头（TTFT）。思考型模型的思考阶段可能较长，
 //     但超过 60 秒基本可判定服务异常或网络问题，直接中断并提示；
 //   - 总时长 30 分钟：整段流式读取（含正文增量）的硬上限，超时后中断并提示内容可能不完整。
-const (
+//
+// aiTTFTTimeout 声明为变量而非常量：单元测试中临时调短以覆盖超时排干分支，
+// 生产值保持 60 秒不变。
+var (
 	aiTTFTTimeout      = 60 * time.Second
 	aiMaxStreamTimeout = 1800 * time.Second
 )
@@ -277,8 +280,14 @@ func (s *Service) emitAI(eventName string, requestID int, session uint64, data s
 	s.mu.RLock()
 	current := s.session
 	unlocked := s.unlocked
+	hook := s.emitAIHook
 	s.mu.RUnlock()
 	if !unlocked || current != session {
+		return
+	}
+	// 测试钩子：替代 Wails 事件推送，便于单元测试断言（生产恒为 nil）。
+	if hook != nil {
+		hook(eventName, requestID, data)
 		return
 	}
 	app := application.Get()

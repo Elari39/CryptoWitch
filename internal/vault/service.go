@@ -53,6 +53,9 @@ type Service struct {
 	aiCancel            context.CancelFunc
 	unlockFailures      int
 	unlockCooldownUntil time.Time
+	// emitAIHook 仅测试使用：非 nil 时替代 Wails 事件推送，便于单元测试
+	// 断言流式事件（生产路径恒为 nil，见 emitAI）。
+	emitAIHook func(eventName string, requestID int, data string)
 }
 
 func NewService(encrypted EncryptedVault) *Service {
