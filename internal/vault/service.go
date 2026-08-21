@@ -271,9 +271,10 @@ func (s *Service) isCurrentSession(session uint64) bool {
 }
 
 // unlockWaitRemaining 返回解锁冷却剩余时长（0 表示可直接尝试）。
+// 仅读取时间字段，使用读锁即可。
 func (s *Service) unlockWaitRemaining() time.Duration {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	if s.unlockCooldownUntil.IsZero() {
 		return 0
 	}

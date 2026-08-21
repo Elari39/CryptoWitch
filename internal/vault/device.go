@@ -40,6 +40,10 @@ func localMACAddresses() ([]string, error) {
 // verifyDevice 校验本机网卡 MAC 是否命中白名单。
 // 白名单为空或含 "*" 时跳过校验（向后兼容：未配置即仅凭密码访问）。
 // 否则本机任一 MAC 命中白名单即放行。
+//
+// 取舍说明：设备校验失败不累计 unlockFailures（不触发限速冷却）。因为白名单
+// 本就以明文形式存在于二进制中（见 README「安全说明」），MAC 校验仅是访问增强
+// 而非机密边界，对设备拒绝做限速没有额外的安全收益。
 func (s *Service) verifyDevice() error {
 	allowed := make(map[string]struct{}, len(s.allowedMACs))
 	for _, mac := range s.allowedMACs {

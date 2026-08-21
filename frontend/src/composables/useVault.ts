@@ -32,183 +32,185 @@ function base64ToBytes(contentBase64: string) {
   return bytes
 }
 
-export function useVault() {
-  const unlocked = shallowRef(false)
-  const tree = shallowRef<VaultTreeNode[]>([])
-  const activeDocument = shallowRef<VaultDocument | null>(null)
-  const pdfLoad = shallowRef<PDFLoadState>({
+// 模块级单例状态：保证全局只有一份 vault 状态树，无论 useVault() 被调用几次
+// （与 useAI 的单例策略一致，避免多处调用产生失步的第二份状态）。
+const unlocked = shallowRef(false)
+const tree = shallowRef<VaultTreeNode[]>([])
+const activeDocument = shallowRef<VaultDocument | null>(null)
+const pdfLoad = shallowRef<PDFLoadState>({
+  url: '',
+  loadedChunks: 0,
+  totalChunks: 0,
+  loadedBytes: 0,
+  totalBytes: 0,
+})
+const loading = shallowRef(false)
+const documentLoading = shallowRef(false)
+const error = shallowRef('')
+let documentRequestID = 0
+
+const hasDocuments = computed(() => tree.value.length > 0)
+const pdfProgress = computed(() => {
+  if (pdfLoad.value.totalChunks <= 0) {
+    return 0
+  }
+  return Math.round((pdfLoad.value.loadedChunks / pdfLoad.value.totalChunks) * 100)
+})
+
+function resetPDFLoad() {
+  if (pdfLoad.value.url) {
+    URL.revokeObjectURL(pdfLoad.value.url)
+  }
+  pdfLoad.value = {
     url: '',
     loadedChunks: 0,
     totalChunks: 0,
     loadedBytes: 0,
     totalBytes: 0,
-  })
-  const loading = shallowRef(false)
-  const documentLoading = shallowRef(false)
-  const error = shallowRef('')
-  let documentRequestID = 0
+  }
+}
 
-  const hasDocuments = computed(() => tree.value.length > 0)
-  const pdfProgress = computed(() => {
-    if (pdfLoad.value.totalChunks <= 0) {
-      return 0
-    }
-    return Math.round((pdfLoad.value.loadedChunks / pdfLoad.value.totalChunks) * 100)
-  })
+function setPDFURLFromBytes(parts: BlobPart[], mimeType: string, loadedBytes: number, totalChunks: number) {
+  resetPDFLoad()
+  pdfLoad.value = {
+    url: URL.createObjectURL(new Blob(parts, { type: mimeType })),
+    loadedChunks: totalChunks,
+    totalChunks,
+    loadedBytes,
+    totalBytes: loadedBytes,
+  }
+}
 
-  function resetPDFLoad() {
-    if (pdfLoad.value.url) {
-      URL.revokeObjectURL(pdfLoad.value.url)
-    }
-    pdfLoad.value = {
-      url: '',
-      loadedChunks: 0,
-      totalChunks: 0,
-      loadedBytes: 0,
-      totalBytes: 0,
-    }
+async function loadChunkedPDF(document: VaultDocument, requestID: number) {
+  const totalChunks = document.chunkCount ?? 0
+  if (totalChunks <= 0) {
+    throw new Error('invalid pdf chunk')
   }
 
-  function setPDFURLFromBytes(parts: BlobPart[], mimeType: string, loadedBytes: number, totalChunks: number) {
-    resetPDFLoad()
-    pdfLoad.value = {
-      url: URL.createObjectURL(new Blob(parts, { type: mimeType })),
-      loadedChunks: totalChunks,
-      totalChunks,
-      loadedBytes,
-      totalBytes: loadedBytes,
-    }
+  const parts: BlobPart[] = []
+  let loadedBytes = 0
+  pdfLoad.value = {
+    url: '',
+    loadedChunks: 0,
+    totalChunks,
+    loadedBytes: 0,
+    totalBytes: document.size,
   }
 
-  async function loadChunkedPDF(document: VaultDocument, requestID: number) {
-    const totalChunks = document.chunkCount ?? 0
-    if (totalChunks <= 0) {
-      throw new Error('invalid pdf chunk')
-    }
-
-    const parts: BlobPart[] = []
-    let loadedBytes = 0
-    pdfLoad.value = {
-      url: '',
-      loadedChunks: 0,
-      totalChunks,
-      loadedBytes: 0,
-      totalBytes: document.size,
-    }
-
-    try {
-      for (let index = 0; index < totalChunks; index += 1) {
-        const chunk = await VaultService.GetPDFChunk(document.id, index)
-        if (requestID !== documentRequestID) {
-          return
-        }
-        const bytes = base64ToBytes(chunk.contentBase64)
-        parts.push(bytes)
-        loadedBytes += bytes.byteLength
-        pdfLoad.value = {
-          url: '',
-          loadedChunks: index + 1,
-          totalChunks,
-          loadedBytes,
-          totalBytes: document.size,
-        }
+  try {
+    for (let index = 0; index < totalChunks; index += 1) {
+      const chunk = await VaultService.GetPDFChunk(document.id, index)
+      if (requestID !== documentRequestID) {
+        return
       }
-    } catch (caught) {
-      // 任一分块拉取失败时先复位加载状态，避免界面停留在「正在加载 PDF x%」。
-      if (requestID === documentRequestID) {
-        resetPDFLoad()
+      const bytes = base64ToBytes(chunk.contentBase64)
+      parts.push(bytes)
+      loadedBytes += bytes.byteLength
+      pdfLoad.value = {
+        url: '',
+        loadedChunks: index + 1,
+        totalChunks,
+        loadedBytes,
+        totalBytes: document.size,
       }
-      throw caught
     }
-
+  } catch (caught) {
+    // 任一分块拉取失败时先复位加载状态，避免界面停留在「正在加载 PDF x%」。
     if (requestID === documentRequestID) {
-      setPDFURLFromBytes(parts, document.mimeType || 'application/pdf', loadedBytes, totalChunks)
+      resetPDFLoad()
     }
+    throw caught
   }
 
-  async function loadLegacyPDF(document: VaultDocument) {
-    if (!document.contentBase64) {
-      throw new Error('PDF 加载失败，请重新选择文档。')
-    }
-    const bytes = base64ToBytes(document.contentBase64)
-    setPDFURLFromBytes([bytes], document.mimeType || 'application/pdf', bytes.byteLength, 1)
+  if (requestID === documentRequestID) {
+    setPDFURLFromBytes(parts, document.mimeType || 'application/pdf', loadedBytes, totalChunks)
   }
+}
 
-  async function unlock(password: string) {
-    documentRequestID += 1
-    loading.value = true
-    documentLoading.value = false
-    error.value = ''
-    resetPDFLoad()
-    try {
-      const response = await VaultService.Unlock(password)
-      tree.value = response.tree
-      unlocked.value = true
-      activeDocument.value = null
-    } catch (caught) {
-      unlocked.value = false
-      tree.value = []
-      activeDocument.value = null
-      const message = caught instanceof Error ? caught.message : ''
-      if (message.includes('device not authorized')) {
-        error.value = '本机未授权，无法查看文档。'
-      } else if (message.includes('too many attempts')) {
-        error.value = '尝试次数过多，请稍后再试。'
+async function loadLegacyPDF(document: VaultDocument) {
+  if (!document.contentBase64) {
+    throw new Error('PDF 加载失败，请重新选择文档。')
+  }
+  const bytes = base64ToBytes(document.contentBase64)
+  setPDFURLFromBytes([bytes], document.mimeType || 'application/pdf', bytes.byteLength, 1)
+}
+
+async function unlock(password: string) {
+  documentRequestID += 1
+  loading.value = true
+  documentLoading.value = false
+  error.value = ''
+  resetPDFLoad()
+  try {
+    const response = await VaultService.Unlock(password)
+    tree.value = response.tree
+    unlocked.value = true
+    activeDocument.value = null
+  } catch (caught) {
+    unlocked.value = false
+    tree.value = []
+    activeDocument.value = null
+    const message = caught instanceof Error ? caught.message : ''
+    if (message.includes('device not authorized')) {
+      error.value = '本机未授权，无法查看文档。'
+    } else if (message.includes('too many attempts')) {
+      error.value = '尝试次数过多，请稍后再试。'
+    } else {
+      error.value = '密码不正确，无法解锁文档。'
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+async function lock() {
+  documentRequestID += 1
+  loading.value = true
+  documentLoading.value = false
+  error.value = ''
+  resetPDFLoad()
+  try {
+    await VaultService.Lock()
+  } finally {
+    unlocked.value = false
+    tree.value = []
+    activeDocument.value = null
+    loading.value = false
+  }
+}
+
+async function openDocument(id: string) {
+  const requestID = documentRequestID + 1
+  documentRequestID = requestID
+  documentLoading.value = true
+  error.value = ''
+  resetPDFLoad()
+  try {
+    const document = await VaultService.GetDocument(id)
+    if (requestID === documentRequestID) {
+      activeDocument.value = document
+    }
+    if (requestID === documentRequestID && document.documentType === 'pdf') {
+      if (document.chunked) {
+        await loadChunkedPDF(document, requestID)
       } else {
-        error.value = '密码不正确，无法解锁文档。'
-      }
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function lock() {
-    documentRequestID += 1
-    loading.value = true
-    documentLoading.value = false
-    error.value = ''
-    resetPDFLoad()
-    try {
-      await VaultService.Lock()
-    } finally {
-      unlocked.value = false
-      tree.value = []
-      activeDocument.value = null
-      loading.value = false
-    }
-  }
-
-  async function openDocument(id: string) {
-    const requestID = documentRequestID + 1
-    documentRequestID = requestID
-    documentLoading.value = true
-    error.value = ''
-    resetPDFLoad()
-    try {
-      const document = await VaultService.GetDocument(id)
-      if (requestID === documentRequestID) {
-        activeDocument.value = document
-      }
-      if (requestID === documentRequestID && document.documentType === 'pdf') {
-        if (document.chunked) {
-          await loadChunkedPDF(document, requestID)
-        } else {
-          await loadLegacyPDF(document)
-        }
-      }
-    } catch (caught) {
-      if (requestID === documentRequestID) {
-        // 兜底复位：任何加载路径失败都不应残留半加载的 PDF 状态。
-        resetPDFLoad()
-        error.value = normalizeError(caught)
-      }
-    } finally {
-      if (requestID === documentRequestID) {
-        documentLoading.value = false
+        await loadLegacyPDF(document)
       }
     }
+  } catch (caught) {
+    if (requestID === documentRequestID) {
+      // 兜底复位：任何加载路径失败都不应残留半加载的 PDF 状态。
+      resetPDFLoad()
+      error.value = normalizeError(caught)
+    }
+  } finally {
+    if (requestID === documentRequestID) {
+      documentLoading.value = false
+    }
   }
+}
 
+export function useVault() {
   return {
     unlocked: readonly(unlocked),
     tree: readonly(tree),

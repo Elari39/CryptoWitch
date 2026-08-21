@@ -44,7 +44,11 @@ func insertNode(nodes *[]TreeNode, parts []string, parentParts []string, documen
 	}
 
 	folderTitle := parts[0]
-	folderParts := append(parentParts, folderTitle)
+	// 显式复制而非 append：append(parentParts, x) 可能复用 parentParts 的底层数组，
+	// 同一父路径下多次插入时存在切片别名风险；复制后 folderParts 独立可控。
+	folderParts := make([]string, len(parentParts)+1)
+	copy(folderParts, parentParts)
+	folderParts[len(parentParts)] = folderTitle
 	folderPath := strings.Join(folderParts, "/")
 	for i := range *nodes {
 		if (*nodes)[i].Kind == "folder" && (*nodes)[i].Title == folderTitle {

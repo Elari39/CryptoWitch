@@ -228,8 +228,9 @@ func (s *Service) streamAIChat(cfg AIConfig, body []byte, requestID int, session
 	}
 
 	scanner := bufio.NewScanner(response.Body)
-	// 单行可能较长（大段增量），提高缓冲上限。
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	// 单行可能较长（大段增量），提高缓冲上限；上限取 4 MiB 以容纳
+	// 超大单条 SSE delta，避免 bufio.ErrTooLong 中断整段流。
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {

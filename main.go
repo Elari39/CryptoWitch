@@ -107,8 +107,9 @@ func cspPolicy(allowRemoteImages bool) string {
 	}, "; ")
 }
 
-// cspAssetHandler 包装 Wails 静态资源服务：对 text/html 响应在 </head> 前注入
-// Content-Security-Policy meta，作为 XSS 的防御纵深。其余资源原样透传。
+// cspAssetHandler 包装 Wails 静态资源服务：仅对 text/html 响应在 </head> 前注入
+// Content-Security-Policy meta，作为 XSS 的防御纵深。其余资源（JS/CSS/字体等）
+// 不缓冲、直接透传，避免大体积静态资产的内存翻倍。
 // dev 模式页面由 Vite dev server 提供，不经过此 handler，因此 CSP 仅在生产构建生效。
 func cspAssetHandler(assets embed.FS, vaultService *vault.Service) http.Handler {
 	base := application.AssetFileServerFS(assets)
@@ -122,28 +123,98 @@ func cspAssetHandler(assets embed.FS, vaultService *vault.Service) http.Handler 
 	))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		buffered := &bufferedResponseWriter{header: make(http.Header)}
-		base.ServeHTTP(buffered, r)
-
-		body := buffered.body.Bytes()
-		if buffered.status == 0 {
-			buffered.status = http.StatusOK
-		}
-		// 仅对完整（非 206 分段）的 HTML 响应注入；注入后 Content-Length 失效，需移除。
-		if buffered.status == http.StatusOK && strings.Contains(buffered.header.Get("Content-Type"), "text/html") {
-			if injected := injectCSPMeta(body, meta); injected != nil {
-				body = injected
-				buffered.header.Del("Content-Length")
-			}
-		}
-
-		header := w.Header()
-		for key, values := range buffered.header {
-			header[key] = values
-		}
-		w.WriteHeader(buffered.status)
-		_, _ = w.Write(body)
+		rec := &htmlOnlyResponseWriter{upstream: w, header: make(http.Header)}
+		base.ServeHTTP(rec, r)
+		rec.finish(meta)
 	})
+}
+
+// htmlOnlyResponseWriter 在收到响应头时按 Content-Type 分流：
+//   - text/html：缓冲完整响应体，供上层注入 CSP 后一次性写回；
+//   - 其余类型：header 与响应体直接透传 upstream，不占用额外内存。
+type htmlOnlyResponseWriter struct {
+	upstream http.ResponseWriter
+	header   http.Header
+	status   int
+	decided  bool
+	html     bool
+	started  bool
+	body     bytes.Buffer
+}
+
+func (b *htmlOnlyResponseWriter) Header() http.Header { return b.header }
+
+func (b *htmlOnlyResponseWriter) WriteHeader(status int) {
+	if b.status != 0 {
+		return
+	}
+	b.status = status
+	b.decide()
+}
+
+// decide 依据当前响应头判定是否为 HTML（WriteHeader 后、首次 Write 前调用）。
+func (b *htmlOnlyResponseWriter) decide() {
+	if b.decided {
+		return
+	}
+	b.decided = true
+	b.html = strings.Contains(b.header.Get("Content-Type"), "text/html")
+}
+
+// flushDirectHeader 把缓存的响应头写到底层 writer（直通模式首次写出前调用）。
+func (b *htmlOnlyResponseWriter) flushDirectHeader() {
+	if b.started {
+		return
+	}
+	b.started = true
+	header := b.upstream.Header()
+	for key, values := range b.header {
+		header[key] = values
+	}
+	status := b.status
+	if status == 0 {
+		status = http.StatusOK
+	}
+	b.upstream.WriteHeader(status)
+}
+
+func (b *htmlOnlyResponseWriter) Write(p []byte) (int, error) {
+	if b.status == 0 {
+		b.status = http.StatusOK
+	}
+	b.decide()
+	if !b.html {
+		b.flushDirectHeader()
+		return b.upstream.Write(p)
+	}
+	return b.body.Write(p)
+}
+
+// finish 在 base handler 返回后收尾：HTML 响应注入 CSP 后写回；
+// 直通响应兜底输出响应头（如空响应体场景）。
+func (b *htmlOnlyResponseWriter) finish(meta []byte) {
+	if !b.html {
+		b.flushDirectHeader()
+		return
+	}
+	body := b.body.Bytes()
+	status := b.status
+	if status == 0 {
+		status = http.StatusOK
+	}
+	// 仅对完整（非 206 分段）的成功 HTML 响应注入；注入后 Content-Length 失效，需移除。
+	if status == http.StatusOK {
+		if injected := injectCSPMeta(body, meta); injected != nil {
+			body = injected
+			b.header.Del("Content-Length")
+		}
+	}
+	header := b.upstream.Header()
+	for key, values := range b.header {
+		header[key] = values
+	}
+	b.upstream.WriteHeader(status)
+	_, _ = b.upstream.Write(body)
 }
 
 // injectCSPMeta 在 </head> 前插入 CSP meta；找不到 </head> 时返回 nil（不注入）。
@@ -161,25 +232,4 @@ func injectCSPMeta(html []byte, meta []byte) []byte {
 	return injected
 }
 
-// bufferedResponseWriter 缓冲完整响应体，供上层在写回前改写。
-type bufferedResponseWriter struct {
-	header http.Header
-	status int
-	body   bytes.Buffer
-}
-
-func (b *bufferedResponseWriter) Header() http.Header {
-	return b.header
-}
-
-func (b *bufferedResponseWriter) WriteHeader(status int) {
-	if b.status == 0 {
-		b.status = status
-	}
-}
-
-func (b *bufferedResponseWriter) Write(p []byte) (int, error) {
-	return b.body.Write(p)
-}
-
-var _ io.Writer = (*bufferedResponseWriter)(nil)
+var _ io.Writer = (*htmlOnlyResponseWriter)(nil)
