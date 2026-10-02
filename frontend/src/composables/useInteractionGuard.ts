@@ -1,4 +1,5 @@
 import { onMounted, onUnmounted } from 'vue'
+import { isAppCopyTarget } from '../lib/clipboard'
 
 const blockedKeys = new Set(['c', 'a', 's', 'p', 'u'])
 
@@ -24,7 +25,7 @@ function onContextMenu(event: Event) {
 }
 
 function onCopy(event: Event) {
-  if (isInsideMarkdownBody(event.target)) {
+  if (isInsideMarkdownBody(event.target) || isAppCopyTarget(event.target)) {
     return
   }
   prevent(event)

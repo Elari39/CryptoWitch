@@ -23,6 +23,10 @@ function expectNoActiveContent(html: string) {
 }
 
 describe("sanitizeHTML — 事件属性剥离", () => {
+  it("合法链接也仅保留经过校验的 href", () => {
+    const out = sanitizeHTML('<a href="https://example.com" onclick="alert(1)" onfocus="alert(2)" style="color:red" ping="https://example.com/ping" download="x" data-x="1"><strong onmouseover="alert(3)">safe</strong></a>');
+    expect(out).toBe('<a href="https://example.com"><strong>safe</strong></a>');
+  });
   it("剥离 img 上的 onerror/onload", () => {
     const out = sanitizeHTML(
       '<p>hi</p><img src="https://evil/x.png" onerror="alert(1)" onload="alert(2)">'

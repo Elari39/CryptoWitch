@@ -15,6 +15,7 @@ const el = ref<HTMLElement | null>(null)
 const html = computed(() => (props.markdown ? renderAIMarkdown(props.content) : props.content))
 
 let mathTimer: ReturnType<typeof setTimeout> | undefined
+const copyTimers = new Set<ReturnType<typeof setTimeout>>()
 
 function renderMath() {
   if (!props.markdown || !el.value) {
@@ -37,18 +38,23 @@ watch(
 )
 
 onMounted(() => void nextTick(renderMath))
-onBeforeUnmount(() => window.clearTimeout(mathTimer))
+onBeforeUnmount(() => {
+  window.clearTimeout(mathTimer)
+  copyTimers.forEach((timer) => window.clearTimeout(timer))
+})
 
 // 点击委托：命中「复制」按钮时，把同代码窗内 code 的文本复制到剪贴板。
 async function copyCode(button: HTMLElement, code: string) {
   if (!code) {
     return
   }
-  await copyText(code)
-  button.textContent = '已复制'
-  window.setTimeout(() => {
+  const copied = await copyText(code)
+  button.textContent = copied ? '已复制' : '复制失败'
+  const timer = window.setTimeout(() => {
+    copyTimers.delete(timer)
     button.textContent = '复制'
   }, 1600)
+  copyTimers.add(timer)
 }
 
 function onContentClick(event: MouseEvent) {

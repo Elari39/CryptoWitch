@@ -18,6 +18,13 @@ export function AIChat(req: $models.AIChatRequest): $CancellablePromise<void> {
 }
 
 /**
+ * CancelAIChat 仅取消匹配的请求；延迟到达的旧取消不能影响新请求。
+ */
+export function CancelAIChat(requestID: number): $CancellablePromise<void> {
+    return $Call.ByID(3024692673, requestID);
+}
+
+/**
  * GetAIInfo 返回当前 AI 配置的可用性与展示信息（不含 apiKey）。
  */
 export function GetAIInfo(): $CancellablePromise<$models.AIInfo> {

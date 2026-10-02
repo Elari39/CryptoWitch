@@ -45,6 +45,7 @@ export interface ReadonlyVaultDocument {
 }
 
 export interface PDFLoadState {
+  readonly status: 'idle' | 'loading' | 'ready' | 'error'
   readonly url: string
   readonly loadedChunks: number
   readonly totalChunks: number

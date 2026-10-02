@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"context"
 	"crypto/cipher"
 	"encoding/base64"
 	"errors"
@@ -50,7 +49,7 @@ type Service struct {
 	allowedMACs         []string
 	aiConfig            AIConfig
 	allowRemoteImages   bool
-	aiCancel            context.CancelFunc
+	aiRequest           *aiRequest
 	unlockFailures      int
 	unlockCooldownUntil time.Time
 	// emitAIHook 仅测试使用：非 nil 时替代 Wails 事件推送，便于单元测试
@@ -71,22 +70,34 @@ func NewService(encrypted EncryptedVault) *Service {
 }
 
 func (s *Service) Unlock(password string) (UnlockResponse, error) {
-	// 冷却期内直接拒绝，避免在线暴力猜解（设备校验之前先检查，省去 KDF 开销）。
-	if wait := s.unlockWaitRemaining(); wait > 0 {
+	return s.unlock(password, decryptManifestWithPassword)
+}
+
+// decrypt 可注入，便于用屏障测试 KDF 与 Lock/Unlock 交错；生产使用密码解密。
+func (s *Service) unlock(password string, decrypt func(EncryptedVault, string) (DocumentManifest, cipher.AEAD, error)) (UnlockResponse, error) {
+	s.mu.Lock()
+	if wait := time.Until(s.unlockCooldownUntil); wait > 0 {
+		s.mu.Unlock()
 		return UnlockResponse{}, fmt.Errorf("%w（约 %d 秒后重试）", ErrTooManyAttempts, int(wait.Seconds())+1)
 	}
+	// 开始新尝试即废弃旧会话，包括仍在进行的 AI 请求和密码计算。
+	s.clearUnlockedStateLocked()
+	session := s.session
+	s.mu.Unlock()
 	if err := s.verifyDevice(); err != nil {
-		s.clearUnlockedState()
 		return UnlockResponse{}, err
 	}
 
-	manifest, aead, err := decryptManifestWithPassword(s.encrypted, password)
+	manifest, aead, err := decrypt(s.encrypted, password)
 	if err != nil {
-		s.noteUnlockFailure()
-		s.clearUnlockedState()
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if session != s.session {
+			return UnlockResponse{}, ErrLocked
+		}
+		s.noteUnlockFailureLocked()
 		return UnlockResponse{}, ErrInvalidPassword
 	}
-	s.resetUnlockThrottle()
 
 	documents := make(map[string]DocumentMetadata, len(manifest.Documents))
 	for _, document := range manifest.Documents {
@@ -97,6 +108,11 @@ func (s *Service) Unlock(password string) (UnlockResponse, error) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if session != s.session {
+		return UnlockResponse{}, ErrLocked
+	}
+	s.unlockFailures = 0
+	s.unlockCooldownUntil = time.Time{}
 	s.aead = aead
 	s.version = s.encrypted.Version
 	s.documents = documents
@@ -105,7 +121,6 @@ func (s *Service) Unlock(password string) (UnlockResponse, error) {
 	s.htmlCacheOrder = nil
 	s.tree = tree
 	s.unlocked = true
-	s.session++
 
 	return UnlockResponse{Tree: cloneTree(tree)}, nil
 }
@@ -117,11 +132,11 @@ func (s *Service) Lock() {
 func (s *Service) clearUnlockedState() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// 取消进行中的 AI 流式请求，避免 goroutine 在锁定后仍挂起至总超时。
-	if s.aiCancel != nil {
-		s.aiCancel()
-		s.aiCancel = nil
-	}
+	s.clearUnlockedStateLocked()
+}
+
+func (s *Service) clearUnlockedStateLocked() {
+	s.cancelAILocked()
 	s.unlocked = false
 	s.session++
 	s.aead = nil
@@ -273,38 +288,15 @@ func (s *Service) isCurrentSession(session uint64) bool {
 	return s.unlocked && s.session == session
 }
 
-// unlockWaitRemaining 返回解锁冷却剩余时长（0 表示可直接尝试）。
-// 仅读取时间字段，使用读锁即可。
-func (s *Service) unlockWaitRemaining() time.Duration {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.unlockCooldownUntil.IsZero() {
-		return 0
-	}
-	return time.Until(s.unlockCooldownUntil)
-}
-
-// noteUnlockFailure 记录一次密码失败；连续失败达到阈值后进入冷却，
+// noteUnlockFailureLocked 记录一次密码失败；调用者持有 mu。
+// 连续失败达到阈值后进入冷却，
 // 冷却时长随超额次数指数递增（上限 4 次翻倍）。
-func (s *Service) noteUnlockFailure() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *Service) noteUnlockFailureLocked() {
 	s.unlockFailures++
 	if s.unlockFailures >= maxUnlockFailures {
-		extra := s.unlockFailures - maxUnlockFailures
-		if extra > 4 {
-			extra = 4
-		}
+		extra := min(s.unlockFailures-maxUnlockFailures, 4)
 		s.unlockCooldownUntil = time.Now().Add(unlockCooldownBase << extra)
 	}
-}
-
-// resetUnlockThrottle 解锁成功后清空失败计数与冷却。
-func (s *Service) resetUnlockThrottle() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.unlockFailures = 0
-	s.unlockCooldownUntil = time.Time{}
 }
 
 // GetSecurityPolicy 返回运行时安全策略信息（不含任何密钥或文档内容），

@@ -182,10 +182,10 @@ export function sanitizeHTML(html: string): string {
       if (tag === 'a') {
         const href = el.getAttribute('href') || ''
         if (isSafeLink(href)) {
+          for (const attr of Array.from(el.attributes)) {
+            el.removeAttribute(attr.name)
+          }
           el.setAttribute('href', href)
-          el.removeAttribute('target')
-          el.removeAttribute('rel')
-          el.removeAttribute('class')
         } else {
           // 解包为纯文本（子节点已消毒完毕）。
           el.replaceWith(...Array.from(el.childNodes))

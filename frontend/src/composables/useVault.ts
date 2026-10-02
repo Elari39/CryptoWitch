@@ -1,6 +1,7 @@
 import { computed, readonly, shallowRef } from 'vue'
 import * as VaultService from '../../bindings/cryptowitch/internal/vault/service'
 import type { PDFLoadState, VaultDocument, VaultTreeNode } from '../types/vault'
+import { useAI } from './useAI'
 
 function normalizeError(error: unknown): string {
   const message = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
@@ -38,6 +39,7 @@ const unlocked = shallowRef(false)
 const tree = shallowRef<VaultTreeNode[]>([])
 const activeDocument = shallowRef<VaultDocument | null>(null)
 const pdfLoad = shallowRef<PDFLoadState>({
+  status: 'idle',
   url: '',
   loadedChunks: 0,
   totalChunks: 0,
@@ -48,6 +50,7 @@ const loading = shallowRef(false)
 const documentLoading = shallowRef(false)
 const error = shallowRef('')
 let documentRequestID = 0
+let sessionOperationID = 0
 
 const hasDocuments = computed(() => tree.value.length > 0)
 const pdfProgress = computed(() => {
@@ -62,6 +65,7 @@ function resetPDFLoad() {
     URL.revokeObjectURL(pdfLoad.value.url)
   }
   pdfLoad.value = {
+    status: 'idle',
     url: '',
     loadedChunks: 0,
     totalChunks: 0,
@@ -73,6 +77,7 @@ function resetPDFLoad() {
 function setPDFURLFromBytes(parts: BlobPart[], mimeType: string, loadedBytes: number, totalChunks: number) {
   resetPDFLoad()
   pdfLoad.value = {
+    status: 'ready',
     url: URL.createObjectURL(new Blob(parts, { type: mimeType })),
     loadedChunks: totalChunks,
     totalChunks,
@@ -90,6 +95,7 @@ async function loadChunkedPDF(document: VaultDocument, requestID: number) {
   const parts: BlobPart[] = []
   let loadedBytes = 0
   pdfLoad.value = {
+    status: 'loading',
     url: '',
     loadedChunks: 0,
     totalChunks,
@@ -107,6 +113,7 @@ async function loadChunkedPDF(document: VaultDocument, requestID: number) {
       parts.push(bytes)
       loadedBytes += bytes.byteLength
       pdfLoad.value = {
+        status: 'loading',
         url: '',
         loadedChunks: index + 1,
         totalChunks,
@@ -136,17 +143,24 @@ async function loadLegacyPDF(document: VaultDocument) {
 }
 
 async function unlock(password: string) {
+  const operationID = ++sessionOperationID
   documentRequestID += 1
   loading.value = true
   documentLoading.value = false
   error.value = ''
   resetPDFLoad()
+  unlocked.value = false
+  tree.value = []
+  activeDocument.value = null
+  useAI().clearOnLock()
   try {
     const response = await VaultService.Unlock(password)
+    if (operationID !== sessionOperationID) return
     tree.value = response.tree
     unlocked.value = true
     activeDocument.value = null
   } catch (caught) {
+    if (operationID !== sessionOperationID) return
     unlocked.value = false
     tree.value = []
     activeDocument.value = null
@@ -159,32 +173,38 @@ async function unlock(password: string) {
       error.value = '密码不正确，无法解锁文档。'
     }
   } finally {
-    loading.value = false
+    if (operationID === sessionOperationID) loading.value = false
   }
 }
 
 async function lock() {
+  const operationID = ++sessionOperationID
   documentRequestID += 1
   loading.value = true
   documentLoading.value = false
   error.value = ''
   resetPDFLoad()
+  unlocked.value = false
+  tree.value = []
+  activeDocument.value = null
+  useAI().clearOnLock()
   try {
     await VaultService.Lock()
+  } catch (caught) {
+    if (operationID === sessionOperationID) error.value = normalizeError(caught)
   } finally {
-    unlocked.value = false
-    tree.value = []
-    activeDocument.value = null
-    loading.value = false
+    if (operationID === sessionOperationID) loading.value = false
   }
 }
 
 async function openDocument(id: string) {
+  if (!unlocked.value || loading.value) return
   const requestID = documentRequestID + 1
   documentRequestID = requestID
   documentLoading.value = true
   error.value = ''
   resetPDFLoad()
+  activeDocument.value = null
   try {
     const document = await VaultService.GetDocument(id)
     if (requestID === documentRequestID) {
@@ -201,6 +221,9 @@ async function openDocument(id: string) {
     if (requestID === documentRequestID) {
       // 兜底复位：任何加载路径失败都不应残留半加载的 PDF 状态。
       resetPDFLoad()
+      if (activeDocument.value?.documentType === 'pdf') {
+        pdfLoad.value = { ...pdfLoad.value, status: 'error' }
+      }
       error.value = normalizeError(caught)
     }
   } finally {

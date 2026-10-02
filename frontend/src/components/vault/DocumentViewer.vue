@@ -25,6 +25,7 @@ const selectionButton = shallowRef<{ visible: boolean; top: number; left: number
 const fileSizeLabel = computed(() => formatSize(props.document?.size))
 // 正文首个一级标题：命中则从正文中移除，避免与顶部标题重复；未命中则为空，回退到文件名。
 const firstHeading = ref('')
+const enhancedBodies = new WeakMap<HTMLElement, string>()
 const pdfLoadingLabel = computed(() => {
   if (props.pdfLoad.totalChunks > 1) {
     return `正在加载 PDF ${props.pdfProgress}%（${props.pdfLoad.loadedChunks}/${props.pdfLoad.totalChunks}）`
@@ -136,7 +137,7 @@ watch(
 )
 
 watch(
-  () => props.document,
+  () => props.pdfLoad.url,
   () => {
     pdfLoaded.value = false
   },
@@ -144,15 +145,24 @@ watch(
 )
 
 watch(
-  () => [props.document?.id, props.document?.html] as const,
-  async () => {
-    await nextTick()
+  () => [markdownBodyRef.value, props.document?.html] as const,
+  ([body, html]) => {
+    if (!body) {
+      firstHeading.value = ''
+      return
+    }
+    if (enhancedBodies.get(body) === html) return
+    enhancedBodies.set(body, html || '')
+    extractFirstHeading()
     renderMarkdownMath()
     enhanceImages()
-    extractFirstHeading()
   },
-  { immediate: true },
+  { flush: 'post' },
 )
+
+watch(() => [props.document?.id, props.loading], () => {
+  selectionButton.value = { visible: false, top: 0, left: 0 }
+})
 
 // 划词 AI 解读：在 Markdown 正文中选中非空文本时，于选区附近显示「AI 解读」按钮。
 function isInsideMarkdownBody(node: Node | null): boolean {
@@ -215,7 +225,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section ref="viewerRef" class="viewer" aria-live="polite">
-    <div v-if="loading" class="viewer-state">正在加载文档...</div>
+    <div v-if="loading && document?.documentType !== 'pdf'" class="viewer-state">正在加载文档...</div>
     <article v-else-if="document?.documentType === 'pdf'" class="pdf-view">
       <header class="document-header pdf-header">
         <div>
@@ -228,7 +238,10 @@ onBeforeUnmount(() => {
         <div v-if="!pdfLoaded" class="pdf-loading">正在打开 PDF...</div>
         <iframe class="pdf-frame" :src="pdfLoad.url" :title="document.title" @load="pdfLoaded = true"></iframe>
       </div>
-      <div v-else class="viewer-state">
+      <div v-else-if="pdfLoad.status === 'error'" class="viewer-state" role="alert">
+        PDF 加载失败，请重新选择文档。
+      </div>
+      <div v-else-if="pdfLoad.status === 'loading'" class="viewer-state">
         <p class="state-title">{{ pdfLoadingLabel }}</p>
         <progress
           v-if="pdfLoad.totalChunks > 1"
@@ -237,6 +250,7 @@ onBeforeUnmount(() => {
           :value="pdfLoad.loadedChunks"
         />
       </div>
+      <div v-else class="viewer-state">请选择文档以打开 PDF。</div>
     </article>
     <article v-else-if="document" class="markdown-view">
       <header class="document-header">

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import AiMessageContent from './AiMessageContent.vue'
 import { useAI } from '../../composables/useAI'
 import { copyText } from '../../lib/clipboard'
@@ -10,6 +10,19 @@ const input = ref('')
 const bodyRef = ref<HTMLElement | null>(null)
 const contextExpanded = ref(false)
 const copiedIndex = ref(-1)
+const copyStatus = ref('')
+const selectionDialog = ref<HTMLDialogElement | null>(null)
+let copyTimer: ReturnType<typeof setTimeout> | undefined
+
+watch(() => ai.pendingSelection.value, (selection) => {
+  if (selection) selectionDialog.value?.showModal()
+  else selectionDialog.value?.close()
+}, { flush: 'post' })
+
+onBeforeUnmount(() => {
+  window.clearTimeout(copyTimer)
+  selectionDialog.value?.close()
+})
 
 // 模型下拉：双向同步到全局 AI 状态（setModel 会校验模型属于配置列表）。
 const selectedModel = computed({
@@ -30,9 +43,11 @@ const canRegenerate = computed(() => {
 })
 
 async function copyMessage(content: string, index: number) {
-  await copyText(content)
+  const copied = await copyText(content)
+  copyStatus.value = copied ? '已复制' : '复制失败'
   copiedIndex.value = index
-  window.setTimeout(() => {
+  window.clearTimeout(copyTimer)
+  copyTimer = window.setTimeout(() => {
     if (copiedIndex.value === index) {
       copiedIndex.value = -1
     }
@@ -83,6 +98,14 @@ watch(() => ai.partial.value, () => void scrollToBottom())
 
 <template>
   <aside class="ai-panel" :class="{ 'is-open': ai.open.value }" aria-label="AI 解读">
+    <dialog ref="selectionDialog" class="selection-dialog" aria-labelledby="selection-dialog-title" @cancel="ai.cancelSelection">
+      <h2 id="selection-dialog-title">切换划选片段？</h2>
+      <p>当前对话将归档到历史。如正在生成，将停止生成并保留已完成消息。</p>
+      <div class="ai-actions">
+        <button type="button" class="ai-ghost-button" autofocus @click="ai.cancelSelection">保留当前对话</button>
+        <button type="button" class="ai-send-button" @click="ai.confirmSelection">开始新对话</button>
+      </div>
+    </dialog>
     <header class="ai-header">
       <div class="ai-titles">
         <p class="ai-kicker">划词解读</p>
@@ -144,7 +167,7 @@ watch(() => ai.partial.value, () => void scrollToBottom())
                 :title="'复制回答（Markdown 源码）'"
                 @click="copyMessage(message.content, index)"
               >
-                {{ copiedIndex === index ? '已复制' : '复制' }}
+                {{ copiedIndex === index ? copyStatus : '复制' }}
               </button>
               <button
                 v-if="canRegenerate && index === visibleMessages.length - 1"
@@ -203,6 +226,19 @@ watch(() => ai.partial.value, () => void scrollToBottom())
 </template>
 
 <style scoped>
+.selection-dialog {
+  max-width: 420px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 24px;
+  color: var(--ink);
+  background: var(--canvas);
+}
+
+.selection-dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+
 .ai-panel {
   position: fixed;
   top: 0;

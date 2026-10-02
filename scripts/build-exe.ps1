@@ -54,6 +54,7 @@ function Assert-AccessConfig {
 $repoRoot = Get-RepoRoot
 $artifactPath = Join-Path $repoRoot "bin\CryptoWitch.exe"
 $accessPath = Join-Path $repoRoot "access.yaml"
+$initialLocation = Get-Location
 
 try {
   Set-Location $repoRoot
@@ -69,11 +70,25 @@ try {
     Write-Host "==> Skip encrypted vault generation"
   }
 
+  # 首次构建时 dist 尚不存在，根 Go 包无法编译；先使用仓库内已提交的
+  # bindings 构建前端，再执行 Go 测试和 Wails bindings 生成。
+  Push-Location (Join-Path $repoRoot "frontend")
+  try {
+    Invoke-Step "Install frontend dependencies" $PackageManager @("install")
+    $frontendBuild = if ($Dev) { "build:dev" } else { "build" }
+    Invoke-Step "Build frontend assets" $PackageManager @("run", $frontendBuild)
+    if (-not $SkipTests) {
+      Invoke-Step "Run frontend tests" $PackageManager @("run", "test")
+    }
+  } finally {
+    Pop-Location
+  }
+
   if (-not $SkipTests) {
     Invoke-Step "Run Go tests" "go" @("test", "./...")
   } else {
     Write-Host ""
-    Write-Host "==> Skip Go tests"
+    Write-Host "==> Skip Go and frontend tests (type checking remains part of the frontend build)"
   }
 
   $wailsArgs = @(
@@ -102,4 +117,5 @@ try {
   Write-Host "Size: $sizeMb MB"
   Write-Host "Updated: $($artifact.LastWriteTime)"
 } finally {
+  Set-Location $initialLocation
 }

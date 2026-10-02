@@ -43,6 +43,8 @@ CryptoWitch 在构建阶段把 Markdown / PDF 文档加密并嵌入应用，运�
 - Wails 窗口启用 `ContentProtectionEnabled`、关闭 DevTools，并限制剪切、拖拽、打印等操作；Markdown 正文允许划选，应用的复制与右键拦截也对该区域放行，供阅读和划词 AI 使用。
 - 提供一键 Windows 构建脚本，也保留 Wails 原生命令。
 
+已有 AI 对话时，更换文档或划选片段会先提示确认；确认后归档已完成消息并停止旧请求，取消则保留原对话。重复选择同一文档的同一片段可继续追问。锁定会立即清空正文、PDF 和 AI 会话，并取消正在进行的 AI 请求；意外断流会提示回答可能不完整，可重试。
+
 ## 技术栈
 
 | 层 | 选型 |
@@ -107,22 +109,11 @@ Copy-Item access.example.yaml access.yaml
 New-Item -ItemType Directory -Force content/plain | Out-Null
 # 将自己的文档复制到 content/plain 后再继续。
 
-# 3. 生成加密 vault（写入 internal/vault/generated.go）
-go run ./cmd/packdocs
-
-# 4. 首次构建先生成前端资源，满足 main.go 的 go:embed
-Push-Location frontend
-pnpm install
-pnpm test
-pnpm run type-check
-pnpm run build
-Pop-Location
-
-# 5. 打包、Go 测试与 Wails Windows 构建
+# 3. 一键生成 vault、安装并构建前端、执行测试及 Wails Windows 构建
 .\build-exe.cmd
 ```
 
-构建完成后，运行 `bin/CryptoWitch.exe`，输入构建时配置的密码。第一次手动构建前端是必要的：一键脚本在 Wails 构建之前执行 `go test ./...`，而根包同时依赖已生成的 vault 和 `frontend/dist`。后续已有这些产物时可直接运行一键脚本。
+构建完成后，运行 `bin/CryptoWitch.exe`，输入构建时配置的密码。首次构建无需手动准备 `frontend/dist`：脚本先使用仓库中已提交的 bindings 构建前端，满足根 Go 包的嵌入依赖，再运行测试和 Wails 构建。
 
 ## 配置说明
 
@@ -267,9 +258,10 @@ Pop-Location
 1. 检查 `go` 和包管理器。
 2. 若不存在 `access.yaml`，报错提示从 `access.example.yaml` 复制创建并填入密码与 MAC 白名单。
 3. 执行 `go run ./cmd/packdocs` 生成加密 vault。
-4. 执行 `go test ./...`。
-5. 执行 Wails Windows 构建。
-6. 检查 `bin/CryptoWitch.exe` 是否生成。
+4. 安装前端依赖，执行前端类型检查与构建。
+5. 执行前端测试和 `go test ./...`。
+6. 执行 Wails Windows 构建（包含 bindings 生成与前端构建）。
+7. 检查 `bin/CryptoWitch.exe` 是否生成。
 
 保留的 Wails 原生命令：
 
@@ -277,7 +269,7 @@ Pop-Location
 go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.96 task windows:build ARCH=amd64 PACKAGE_MANAGER=pnpm
 ```
 
-如需跳过文档重新打包或测试，可使用脚本已有参数：`-SkipPackDocs`、`-SkipTests`、`-Dev`。
+如需跳过文档重新打包或测试，可使用脚本已有参数：`-SkipPackDocs`、`-SkipTests`、`-Dev`。`-SkipTests` 同时跳过 Go 与前端测试，前端构建仍包含类型检查；`-Dev` 使用前端开发构建和 Wails 开发编译选项。
 
 ## 项目结构
 

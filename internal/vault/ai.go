@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -62,9 +63,19 @@ type openAIStreamRequest struct {
 }
 
 type openAIStreamChoice struct {
-	Delta struct {
+	FinishReason string `json:"finish_reason"`
+	Delta        struct {
 		Content string `json:"content"`
 	} `json:"delta"`
+}
+
+// 指针身份区分请求实例，旧请求退出时不得清除新请求的取消句柄。
+type aiRequest struct {
+	id      int
+	session uint64
+	ctx     context.Context
+	cancel  context.CancelFunc
+	ttft    time.Duration
 }
 
 type openAIStreamChunk struct {
@@ -95,10 +106,8 @@ func resolveAIModel(requested string, models []string) (string, error) {
 		}
 		return models[0], nil
 	}
-	for _, model := range models {
-		if model == requested {
-			return requested, nil
-		}
+	if slices.Contains(models, requested) {
+		return requested, nil
 	}
 	return "", fmt.Errorf("模型 %s 未在 access.yaml 的 ai.models 中配置", requested)
 }
@@ -158,28 +167,61 @@ func (s *Service) AIChat(req AIChatRequest) error {
 		return fmt.Errorf("encode ai request: %w", err)
 	}
 
-	// 在后台完成流式读取，事件驱动前端更新。totalCtx 由 AIChat 创建并登记 cancel，
-	// 以便 Lock/clearUnlockedState 取消进行中的流式请求，避免 goroutine 挂起至总超时。
-	totalCtx, cancel := context.WithTimeout(context.Background(), aiMaxStreamTimeout)
-	s.mu.Lock()
-	// 取消上一条仍在进行的流式请求（防御性；前端 streaming 标志通常已阻止并发）。
-	if s.aiCancel != nil {
-		s.aiCancel()
+	active, err := s.registerAIRequest(req.RequestID, session)
+	if err != nil {
+		return err
 	}
-	s.aiCancel = cancel
-	s.mu.Unlock()
-	go s.streamAIChat(cfg, body, req.RequestID, session, totalCtx, cancel)
+	go s.streamAIChat(cfg, body, active)
 	return nil
 }
 
-func (s *Service) streamAIChat(cfg AIConfig, body []byte, requestID int, session uint64, totalCtx context.Context, cancel context.CancelFunc) {
-	// totalCtx 由 AIChat 创建（含 aiMaxStreamTimeout 总时长上限）；cancel 已登记到
-	// s.aiCancel，Lock 时会调用以中断进行中的流式读取。defer 兑底释放定时器资源。
-	defer cancel()
+func (s *Service) registerAIRequest(id int, session uint64) (*aiRequest, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// 请求构建期间可能发生锁定；检查与登记必须原子执行。
+	if !s.unlocked || s.session != session {
+		return nil, ErrLocked
+	}
+	s.cancelAILocked()
+	ctx, cancel := context.WithTimeout(context.Background(), aiMaxStreamTimeout)
+	active := &aiRequest{id: id, session: session, ctx: ctx, cancel: cancel, ttft: aiTTFTTimeout}
+	s.aiRequest = active
+	return active, nil
+}
+
+// CancelAIChat 仅取消匹配的请求；延迟到达的旧取消不能影响新请求。
+func (s *Service) CancelAIChat(requestID int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.aiRequest != nil && s.aiRequest.id == requestID {
+		s.cancelAILocked()
+	}
+}
+
+func (s *Service) cancelAILocked() {
+	if s.aiRequest != nil {
+		s.aiRequest.cancel()
+		s.aiRequest = nil
+	}
+}
+
+func (s *Service) finishAIRequest(active *aiRequest) {
+	active.cancel()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.aiRequest == active {
+		s.aiRequest = nil
+	}
+}
+
+func (s *Service) streamAIChat(cfg AIConfig, body []byte, active *aiRequest) {
+	defer s.finishAIRequest(active)
+	totalCtx, cancel := active.ctx, active.cancel
+	emit := func(name, data string) { s.emitAI(name, active, data) }
 
 	request, err := http.NewRequestWithContext(totalCtx, http.MethodPost, cfg.Endpoint, bytes.NewReader(body))
 	if err != nil {
-		s.emitAI(aiEventError, requestID, session, "构建 AI 请求失败："+err.Error())
+		emit(aiEventError, "构建 AI 请求失败："+err.Error())
 		return
 	}
 	request.Header.Set("Content-Type", "application/json")
@@ -197,36 +239,46 @@ func (s *Service) streamAIChat(cfg AIConfig, body []byte, requestID int, session
 		doCh <- doResult{response: response, err: doErr}
 	}()
 
-	ttft := time.NewTimer(aiTTFTTimeout)
+	ttft := time.NewTimer(active.ttft)
 	defer ttft.Stop()
-
-	var response *http.Response
-	select {
-	case result := <-doCh:
-		if result.err != nil {
-			cancel()
-			s.emitAI(aiEventError, requestID, session, "AI 请求失败："+result.err.Error())
-			return
-		}
-		response = result.response
-	case <-ttft.C:
-		cancel()
-		s.emitAI(aiEventError, requestID, session, "AI 首字响应超时（60 秒），请重试或切换模型。")
-		// Do goroutine 可能恰在超时前后拿到响应并塞入缓冲 channel；此时无人消费，
-		// 需在后台排干并关闭 response.Body，避免连接泄漏。
+	drain := func() {
 		go func() {
 			result := <-doCh
 			if result.response != nil {
 				_ = result.response.Body.Close()
 			}
 		}()
+	}
+
+	var response *http.Response
+	select {
+	case result := <-doCh:
+		if result.err != nil {
+			cancel()
+			if result.response != nil {
+				_ = result.response.Body.Close()
+			}
+			emit(aiEventError, "AI 请求失败："+result.err.Error())
+			return
+		}
+		response = result.response
+	case <-ttft.C:
+		cancel()
+		emit(aiEventError, "AI 首字响应超时（60 秒），请重试或切换模型。")
+		// Do goroutine 可能恰在超时前后拿到响应并塞入缓冲 channel；此时无人消费，
+		// 需在后台排干并关闭 response.Body，避免连接泄漏。
+		drain()
+		return
+	case <-totalCtx.Done():
+		emit(aiEventError, "AI 请求已取消或超时。")
+		drain()
 		return
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(io.LimitReader(response.Body, 2048))
-		s.emitAI(aiEventError, requestID, session, fmt.Sprintf("AI 服务返回 %d：%s", response.StatusCode, strings.TrimSpace(string(raw))))
+		emit(aiEventError, fmt.Sprintf("AI 服务返回 %d：%s", response.StatusCode, strings.TrimSpace(string(raw))))
 		return
 	}
 
@@ -234,16 +286,19 @@ func (s *Service) streamAIChat(cfg AIConfig, body []byte, requestID int, session
 	// 单行可能较长（大段增量），提高缓冲上限；上限取 4 MiB 以容纳
 	// 超大单条 SSE delta，避免 bufio.ErrTooLong 中断整段流。
 	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	completed := false
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
 			continue
 		}
-		if !strings.HasPrefix(line, "data:") {
+		data, ok := strings.CutPrefix(line, "data:")
+		if !ok {
 			continue
 		}
-		payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		payload := strings.TrimSpace(data)
 		if payload == "[DONE]" {
+			completed = true
 			break
 		}
 		var chunk openAIStreamChunk
@@ -251,43 +306,49 @@ func (s *Service) streamAIChat(cfg AIConfig, body []byte, requestID int, session
 			continue
 		}
 		if chunk.Error != nil {
-			s.emitAI(aiEventError, requestID, session, "AI 服务错误："+chunk.Error.Message)
+			emit(aiEventError, "AI 服务错误："+chunk.Error.Message)
 			return
 		}
 		if len(chunk.Choices) == 0 {
 			continue
 		}
 		delta := chunk.Choices[0].Delta.Content
-		if delta == "" {
-			continue
+		if delta != "" {
+			emit(aiEventChunk, delta)
 		}
-		s.emitAI(aiEventChunk, requestID, session, delta)
+		if chunk.Choices[0].FinishReason != "" {
+			completed = true
+			break
+		}
 	}
 	if err := scanner.Err(); err != nil && !errors.Is(err, io.EOF) {
 		// 总时长上限到期时，net/http 会以 deadline/cancel 类错误中断读取。
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-			s.emitAI(aiEventError, requestID, session, "读取 AI 响应超时（最长 30 分钟），内容可能不完整。")
+			emit(aiEventError, "读取 AI 响应超时（最长 30 分钟），内容可能不完整。")
 		} else {
-			s.emitAI(aiEventError, requestID, session, "读取 AI 响应失败："+err.Error())
+			emit(aiEventError, "读取 AI 响应失败："+err.Error())
 		}
 		return
 	}
-	s.emitAI(aiEventDone, requestID, session, "")
+	if !completed {
+		emit(aiEventError, "AI 响应意外结束，内容可能不完整，请重试。")
+		return
+	}
+	emit(aiEventDone, "")
 }
 
-func (s *Service) emitAI(eventName string, requestID int, session uint64, data string) {
+func (s *Service) emitAI(eventName string, active *aiRequest, data string) {
 	// 会话已切换（锁定或重新解锁），丢弃过期事件。
 	s.mu.RLock()
-	current := s.session
-	unlocked := s.unlocked
+	valid := s.unlocked && s.session == active.session && s.aiRequest == active
 	hook := s.emitAIHook
 	s.mu.RUnlock()
-	if !unlocked || current != session {
+	if !valid {
 		return
 	}
 	// 测试钩子：替代 Wails 事件推送，便于单元测试断言（生产恒为 nil）。
 	if hook != nil {
-		hook(eventName, requestID, data)
+		hook(eventName, active.id, data)
 		return
 	}
 	app := application.Get()
@@ -295,7 +356,7 @@ func (s *Service) emitAI(eventName string, requestID int, session uint64, data s
 		return
 	}
 	app.Event.Emit(eventName, map[string]any{
-		"requestId": requestID,
+		"requestId": active.id,
 		"data":      data,
 	})
 }

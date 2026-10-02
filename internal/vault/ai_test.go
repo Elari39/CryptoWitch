@@ -328,8 +328,8 @@ func TestLockCancelsInflightAIStream(t *testing.T) {
 	}
 
 	service.mu.Lock()
-	if service.aiCancel != nil {
-		t.Fatal("aiCancel should be cleared after Lock")
+	if service.aiRequest != nil {
+		t.Fatal("aiRequest should be cleared after Lock")
 	}
 	service.mu.Unlock()
 }
@@ -520,10 +520,16 @@ func TestStreamAIChatReadTimeoutDuringStream(t *testing.T) {
 	session := service.session
 	cfg := service.aiConfig
 	service.mu.RUnlock()
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 	defer cancel()
 	body := []byte(`{"model":"m","stream":true,"messages":[]}`)
-	go service.streamAIChat(cfg, body, 1, session, ctx, cancel)
+	active, err := service.registerAIRequest(1, session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	active.cancel()
+	active.ctx, active.cancel = ctx, cancel
+	go service.streamAIChat(cfg, body, active)
 
 	// 第一个 chunk 应正常送达，随后是读取超时错误。
 	event := waitAIEvent(t, events)

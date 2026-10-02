@@ -9,6 +9,11 @@ interface AIEventPayload {
   data: string
 }
 
+interface SelectionContext {
+  text: string
+  documentId: string
+}
+
 // 模块级单例状态：保证全局只有一个 AI 会话上下文，无论 useAI() 被调用几次。
 const open = shallowRef(false)
 const available = shallowRef(false)
@@ -24,7 +29,13 @@ const error = shallowRef('')
 const currentDocumentId = shallowRef('')
 const lastQuestion = shallowRef('')
 const failedPartial = shallowRef(false)
+const pendingSelection = shallowRef<SelectionContext | null>(null)
 let requestId = 0
+let contextVersion = 0
+let activeRequestId: number | null = null
+// 登记、取消和下一条请求串行执行，覆盖取消先于 AIChat 返回的情况。
+let requestQueue: Promise<void> = Promise.resolve()
+let infoLoad: { version: number; promise: Promise<void> } | null = null
 let historyCounter = 0
 let listenersBound = false
 
@@ -41,7 +52,7 @@ function bindListeners() {
 
   Events.On('ai:chunk', (event) => {
     const payload = payloadOf(event)
-    if (payload.requestId !== requestId) {
+    if (payload.requestId !== requestId || !streaming.value) {
       return
     }
     partial.value += payload.data
@@ -49,7 +60,7 @@ function bindListeners() {
 
   Events.On('ai:done', (event) => {
     const payload = payloadOf(event)
-    if (payload.requestId !== requestId) {
+    if (payload.requestId !== requestId || !streaming.value) {
       return
     }
     finalizeAssistant()
@@ -57,7 +68,7 @@ function bindListeners() {
 
   Events.On('ai:error', (event) => {
     const payload = payloadOf(event)
-    if (payload.requestId !== requestId) {
+    if (payload.requestId !== requestId || !streaming.value) {
       return
     }
     error.value = payload.data || 'AI 解读失败，请稍后重试。'
@@ -67,6 +78,7 @@ function bindListeners() {
       finalizeAssistant()
     } else {
       streaming.value = false
+      activeRequestId = null
     }
   })
 }
@@ -75,6 +87,7 @@ function finalizeAssistant() {
   const content = partial.value
   partial.value = ''
   streaming.value = false
+  activeRequestId = null
   if (content) {
     messages.value = [...messages.value, { role: 'assistant', content }]
   }
@@ -84,18 +97,27 @@ async function ensureInfo() {
   if (available.value || model.value) {
     return
   }
-  try {
-    const info = await VaultService.GetAIInfo()
-    available.value = info.available
-    model.value = info.model || ''
-    models.value =
-      info.models && info.models.length > 0 ? info.models : info.model ? [info.model] : []
-    if (!selectedModel.value && models.value.length > 0) {
-      selectedModel.value = models.value[0]
+  const version = contextVersion
+  if (infoLoad?.version === version) return infoLoad.promise
+  const promise = (async () => {
+    try {
+      const info = await VaultService.GetAIInfo()
+      if (version !== contextVersion) return
+      available.value = info.available
+      model.value = info.model || ''
+      models.value =
+        info.models && info.models.length > 0 ? info.models : info.model ? [info.model] : []
+      if (!selectedModel.value && models.value.length > 0) {
+        selectedModel.value = models.value[0]
+      }
+    } catch {
+      if (version === contextVersion) available.value = false
+    } finally {
+      if (infoLoad?.version === version) infoLoad = null
     }
-  } catch {
-    available.value = false
-  }
+  })()
+  infoLoad = { version, promise }
+  return promise
 }
 
 function setModel(name: string) {
@@ -105,17 +127,57 @@ function setModel(name: string) {
 }
 
 function openWithSelection(text: string, documentId: string) {
-  selectedContext.value = text
-  currentDocumentId.value = documentId
+  const selected = { text: text.trim(), documentId }
+  if (!selected.text) return
   open.value = true
+  if (selected.text === selectedContext.value && documentId === currentDocumentId.value) return
+  if (messages.value.length > 0 || streaming.value) {
+    pendingSelection.value = selected
+    return
+  }
+  applySelection(selected)
+}
+
+function applySelection(selected: SelectionContext) {
+  contextVersion += 1
+  selectedContext.value = selected.text
+  currentDocumentId.value = selected.documentId
+  pendingSelection.value = null
   void ensureInfo()
+}
+
+function confirmSelection() {
+  const selected = pendingSelection.value
+  if (!selected) return
+  newConversation()
+  applySelection(selected)
+}
+
+function cancelSelection() {
+  pendingSelection.value = null
 }
 
 function close() {
   open.value = false
+  cancelSelection()
+}
+
+function stopStream() {
+  const cancelledId = activeRequestId
+  activeRequestId = null
+  requestId += 1
+  streaming.value = false
+  if (cancelledId !== null) {
+    requestQueue = requestQueue
+      .then(() => VaultService.CancelAIChat(cancelledId))
+      .catch(() => { /* Lock 或下一次 AIChat 也会取消旧请求。 */ })
+  }
 }
 
 function newConversation() {
+  contextVersion += 1
+  pendingSelection.value = null
+  stopStream()
   // 当前对话有内容则归档到历史。
   if (messages.value.length > 0) {
     historyCounter += 1
@@ -128,7 +190,7 @@ function newConversation() {
         title,
         documentId: currentDocumentId.value,
         selectedText: selectedContext.value,
-        messages: messages.value,
+        messages: failedPartial.value ? messages.value.slice(0, -1) : messages.value,
         createdAt: Date.now(),
       },
     ]
@@ -139,7 +201,6 @@ function newConversation() {
   streaming.value = false
   lastQuestion.value = ''
   failedPartial.value = false
-  requestId += 1 // 让进行中的流式回调失效
 }
 
 function loadHistory(index: number) {
@@ -164,6 +225,9 @@ function loadHistory(index: number) {
 }
 
 function clearOnLock() {
+  contextVersion += 1
+  stopStream()
+  pendingSelection.value = null
   messages.value = []
   histories.value = []
   partial.value = ''
@@ -175,7 +239,6 @@ function clearOnLock() {
   lastQuestion.value = ''
   failedPartial.value = false
   selectedModel.value = models.value[0] || ''
-  requestId += 1
 }
 
 /**
@@ -199,6 +262,7 @@ function startStream(question: string, historyMessages: VaultAIMessage[]) {
   error.value = ''
   requestId += 1
   const currentRequestId = requestId
+  activeRequestId = currentRequestId
   streaming.value = true
   partial.value = ''
 
@@ -207,31 +271,39 @@ function startStream(question: string, historyMessages: VaultAIMessage[]) {
     content: message.content,
   }))
 
-  VaultService.AIChat(
-    new AIChatRequest({
-      requestId: currentRequestId,
-      documentId: currentDocumentId.value,
-      selectedText: selectedContext.value,
-      question,
-      history,
-      model: selectedModel.value,
-    }),
-  ).catch((caught) => {
+  const request = new AIChatRequest({
+    requestId: currentRequestId,
+    documentId: currentDocumentId.value,
+    selectedText: selectedContext.value,
+    question,
+    history,
+    model: selectedModel.value,
+  })
+  requestQueue = requestQueue.then(async () => {
+    if (currentRequestId !== requestId) return
+    await VaultService.AIChat(request)
+    if (currentRequestId !== requestId) {
+      await VaultService.CancelAIChat(currentRequestId)
+    }
+  }).catch((caught) => {
     if (currentRequestId === requestId) {
       error.value = caught instanceof Error ? caught.message : 'AI 解读请求失败。'
       streaming.value = false
+      activeRequestId = null
     }
   })
 }
 
 async function ask(question: string) {
   const trimmed = question.trim()
-  if (!trimmed || streaming.value) {
+  if (!trimmed || streaming.value || pendingSelection.value) {
     return
   }
+  const version = contextVersion
   if (!available.value) {
     await ensureInfo()
   }
+  if (version !== contextVersion || streaming.value || pendingSelection.value) return
   if (!available.value) {
     error.value = '未配置划词 AI 服务，无法解读。'
     return
@@ -246,12 +318,14 @@ async function ask(question: string) {
 
 /** 重试：重新发送最后一条问题（可先切换模型再重试）。 */
 async function retry() {
-  if (streaming.value || !lastQuestion.value) {
+  if (streaming.value || !lastQuestion.value || pendingSelection.value) {
     return
   }
+  const version = contextVersion
   if (!available.value) {
     await ensureInfo()
   }
+  if (version !== contextVersion || streaming.value || pendingSelection.value) return
   if (!available.value) {
     error.value = '未配置划词 AI 服务，无法解读。'
     return
@@ -270,16 +344,18 @@ async function retry() {
 
 /** 重新生成：覆盖最后一条助手回答（同一问题再问一次，不追加新的用户消息）。 */
 async function regenerate() {
-  if (streaming.value || error.value) {
+  if (streaming.value || error.value || pendingSelection.value) {
     return
   }
   const last = messages.value[messages.value.length - 1]
   if (!last || last.role !== 'assistant') {
     return
   }
+  const version = contextVersion
   if (!available.value) {
     await ensureInfo()
   }
+  if (version !== contextVersion || streaming.value || pendingSelection.value) return
   if (!available.value) {
     error.value = '未配置划词 AI 服务，无法解读。'
     return
@@ -315,6 +391,9 @@ export function useAI() {
     selectedContext: readonly(selectedContext),
     error: readonly(error),
     lastQuestion: readonly(lastQuestion),
+    pendingSelection: readonly(pendingSelection),
+    confirmSelection,
+    cancelSelection,
     openWithSelection,
     close,
     ask,
