@@ -2,6 +2,8 @@
 
 > 基于 Wails v3 + Go + Vue 3 的本地桌面文档保险箱：构建期加密、运行期按密码 + 设备授权解锁。
 
+[源码仓库](https://github.com/Elari39/CryptoWitch) · [项目详解](https://elari39.github.io/projects/cryptowitch/) · [灰烬女巫的魔典](https://elari39.github.io/)
+
 CryptoWitch 在构建阶段把 Markdown / PDF 文档加密并嵌入应用，运行时只有 **密码正确 + 本机设备在白名单内** 才会解锁目录并按需加载正文。
 
 它适合分发离线学习资料、内部文档、课程笔记或需要基础访问控制的只读资料包——重点不是把文件放到服务器上，而是把内容、查看器和基础防护一起打包进一个 Windows exe。
@@ -26,18 +28,19 @@ CryptoWitch 在构建阶段把 Markdown / PDF 文档加密并嵌入应用，运�
 - [验证命令](#验证命令)
 - [安全说明](#安全说明)
 - [常见问题](#常见问题)
+- [许可](#许可)
 
 ## 功能特性
 
 - 构建期加密 Markdown / PDF，运行时按密码解锁。
 - 使用 Argon2id 派生密钥，AES-256-GCM 加密 vault 数据。
 - 每篇文档独立加密，避免解锁时一次性把全部正文加载进内存。
-- **设备白名单**：基于网卡 MAC 限制可查看文档的设备；`allowedMACs` 设为 `*` 或留空时退化为仅凭密码访问。
+- **设备白名单**：基于网卡 MAC 限制可查看文档的设备；`allowedMACs: ["*"]` 或空列表时退化为仅凭密码访问。不要把 `*` 与具体 MAC 混写：实现会忽略 `*`，仍校验其余具体地址。
 - PDF 使用 1 MiB 明文块分块加密，前端按块加载后再交给内置 PDF 查看器打开。
 - Markdown 支持 GFM、代码高亮和 KaTeX 数学公式渲染，渲染结果在解锁会话内缓存。
 - **划词 AI 解读**（Markdown 文档）：在正文中划选片段即可送入 AI 上下文，支持多轮追问与会话内历史记录，回复流式输出并在右侧抽屉以 Markdown + LaTeX（KaTeX）渲染展示；代码块带语言标识、语法高亮与一键复制。支持**多模型切换**（access.yaml 的 `ai.models` 数组，请求携带所选模型并后端校验）、**失败重试**、最后一条回答**重新生成**，以及一键**复制回答**（Markdown 源码）。
-- 前端提供目录树、文档搜索、文档类型标识和大小提示；左侧目录与右侧 AI 面板支持收起/展开及拖拽调宽。
-- Wails 窗口启用 `ContentProtectionEnabled`，并禁用右键、复制、选中、拖拽和常见快捷键。
+- 前端提供目录树、按标题和路径筛选、文档类型标识和大小提示；左侧目录与右侧 AI 面板支持收起/展开及拖拽调宽。筛选不搜索正文。
+- Wails 窗口启用 `ContentProtectionEnabled`、关闭 DevTools，并限制剪切、拖拽、打印等操作；Markdown 正文允许划选，应用的复制与右键拦截也对该区域放行，供阅读和划词 AI 使用。
 - 提供一键 Windows 构建脚本，也保留 Wails 原生命令。
 
 ## 技术栈
@@ -81,57 +84,45 @@ generated.go (嵌入 exe)          点击文档 → 按需解密单篇正文
 ## 环境要求
 
 - Windows 10/11
-- Go 1.25 或与 `go.mod` 兼容的 Go 版本
-- Node.js + pnpm
+- Go 1.25.0 或兼容版本，以 [go.mod](go.mod) 为准
+- Node.js 22.12+（前端使用 Vite 8）与 pnpm
 - WebView2 Runtime
+
+Wails CLI、Go 依赖与前端 `@wailsio/runtime` 均使用 `v3.0.0-alpha.96`。当前可直接使用的构建流程面向 Windows；`build/` 中保留了其他平台的 Wails 模板，但默认 pnpm 任务调用 `cmd /c`，不能据此认定 Linux、macOS、移动端或 server 模式已完成适配。
 
 如果使用 `.\build-exe.cmd` 或 `.\scripts\build-exe.ps1`，脚本会检查 `go` 和所选包管理器是否可用。默认包管理器是 `pnpm`。
 
 ## 快速开始
 
-> 以下两种方式任选其一。首次构建需先按 [配置说明](#配置说明) 准备 `access.yaml`。
+首次构建需要自行准备文档；仓库不包含真实的 `content/plain` 明文资料，也不包含 `internal/vault/generated.go`。以下命令在 Windows 的仓库根目录执行。
 
 ### PowerShell
 
 ```powershell
 # 1. 准备访问配置（从示例复制后编辑 password 与 allowedMACs）
 Copy-Item access.example.yaml access.yaml
+# 不使用 AI 时删除示例中的 ai 整段；示例非空字段会被判断为已配置。
 
-# 2. 生成加密 vault（写入 internal/vault/generated.go）
+# 2. 创建文档目录，放入至少一份非空 .md 或 .pdf
+New-Item -ItemType Directory -Force content/plain | Out-Null
+# 将自己的文档复制到 content/plain 后再继续。
+
+# 3. 生成加密 vault（写入 internal/vault/generated.go）
 go run ./cmd/packdocs
 
-# 3. 构建前端
+# 4. 首次构建先生成前端资源，满足 main.go 的 go:embed
 Push-Location frontend
 pnpm install
+pnpm test
 pnpm run type-check
 pnpm run build
 Pop-Location
 
-# 4. 构建 Windows exe
+# 5. 打包、Go 测试与 Wails Windows 构建
 .\build-exe.cmd
 ```
 
-### Bash
-
-```bash
-# 1. 准备访问配置
-cp access.example.yaml access.yaml
-
-# 2. 生成加密 vault
-go run ./cmd/packdocs
-
-# 3. 构建前端
-cd frontend
-pnpm install
-pnpm run type-check
-pnpm run build
-cd ..
-
-# 4. 构建 Windows exe
-go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.96 task windows:build ARCH=amd64
-```
-
-构建完成后，Windows 产物默认位于 `bin/CryptoWitch.exe`。
+构建完成后，运行 `bin/CryptoWitch.exe`，输入构建时配置的密码。第一次手动构建前端是必要的：一键脚本在 Wails 构建之前执行 `go test ./...`，而根包同时依赖已生成的 vault 和 `frontend/dist`。后续已有这些产物时可直接运行一键脚本。
 
 ## 配置说明
 
@@ -141,10 +132,9 @@ go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.96 task windows:buil
 # 构建期 vault 加密密码；运行时用户需输入相同密码才能解锁。
 password: "change-this-password"
 # 允许查看文档的网卡 MAC 白名单，命中任一即放行。
-# 设为 "*"（或留空整段）时跳过 MAC 校验，仅凭密码即可查看。
+# 如需跳过校验，将整个列表替换为 allowedMACs: ["*"] 或 []，不要混写。
 allowedMACs:
   - "AA:BB:CC:DD:EE:FF"
-  # - "*"
 # 划词 AI 解读服务凭证（OpenAI 兼容 /chat/completions 接口）。
 # 构建期注入并编译进 exe；仅本地维护，不要提交到仓库。
 # 留空整段或字段时，运行时划词 AI 功能不可用。
@@ -163,7 +153,7 @@ ai:
 | 字段 | 说明 |
 | --- | --- |
 | `password` | 构建期派生密钥的密码。运行时输入的密码必须与之相同，否则解锁失败。该密码不进入二进制。 |
-| `allowedMACs` | 网卡 MAC 白名单。命中任一即放行；含 `*` 或留空时跳过 MAC 校验。 |
+| `allowedMACs` | 网卡 MAC 白名单。命中任一具体地址即放行；仅有 `*`、空列表或省略字段时跳过校验。支持常见冒号、连字符及点分格式。 |
 | `ai.endpoint` | 划词 AI 解读使用的 OpenAI 兼容 chat completions 接口地址。构建期注入二进制，运行时由后端调用。 |
 | `ai.apiKey` | 上述接口的 Bearer Token。明文凭证，仅本地维护，不要提交仓库。 |
 | `ai.models` | 可用模型名数组，列表首个为默认模型，运行时可在 AI 面板切换。**优先于** `ai.model`。 |
@@ -216,7 +206,9 @@ content/
 go run ./cmd/packdocs
 ```
 
-生成结果会更新 `internal/vault/generated.go`（构建产物，不要手工编辑；已加入 `.gitignore`，不再随仓库提交，克隆后需先执行本命令生成）。若同时改动了 `access.yaml` 的密码或 MAC 白名单，也需重新执行该命令。
+生成结果会更新 `internal/vault/generated.go`（构建产物，不要手工编辑；已加入 `.gitignore`，克隆后需先生成）。文档、密码、MAC 白名单、AI 配置、KDF 参数或远程图片开关发生变化时，都需要重新打包并构建 exe；运行中的 exe 不会读取本地 YAML。
+
+打包器支持 `-config`、`-access`、`-content`、`-out` 四个参数，默认值分别为 `config.yaml`、`access.yaml`、`content/plain`、`internal/vault/generated.go`。它只收集 `.md` / `.pdf`，不会把 Markdown 相对引用的图片或附件一起打包。
 
 ## 开发调试
 
@@ -250,6 +242,7 @@ go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.96 task dev
 
 ```powershell
 Push-Location frontend
+pnpm test
 pnpm run type-check
 pnpm run build
 Pop-Location
@@ -309,7 +302,7 @@ go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.96 task windows:buil
 
 ## 验证命令
 
-后端测试：
+后端测试（先完成快速开始中的 vault 生成与前端构建）：
 
 ```powershell
 go test ./...
@@ -326,6 +319,7 @@ go build ./...
 
 ```powershell
 Push-Location frontend
+pnpm test
 pnpm run type-check
 pnpm run build
 Pop-Location
@@ -337,12 +331,14 @@ Pop-Location
 .\scripts\build-exe.ps1 -Arch amd64 -PackageManager pnpm
 ```
 
+测试覆盖打包输入、目录树、密码与设备校验、PDF 分块、会话锁定、AI 流式响应、Markdown 消毒和 CSP 注入。单元测试与前端构建不能替代在 WebView2 中手动核对解锁、PDF 阅读、划词 AI、锁定和截图保护。
+
 ## 安全说明
 
 CryptoWitch 提供的是本地资料包的防护增强，**不是 DRM，也不是不可破解的内容保护系统**。请特别注意：
 
 - `ContentProtectionEnabled` 依赖操作系统和 WebView2 能力，不能保证阻止所有截图或录屏。
-- 禁用复制、右键、选中和快捷键只能降低误操作或普通复制成本，不能防止调试工具、管理员权限工具、驱动级工具或逆向分析。
+- 交互限制只能降低误操作或普通复制成本；Markdown 正文有意允许划选与复制，不能将本应用描述为禁止复制的阅读器。操作系统工具、管理员权限及逆向分析均不在这些限制的保障范围内。
 - **MAC 白名单非机密、仅为访问增强**：白名单以明文编译进 exe，可被静态提取获知目标 MAC；网卡 MAC 可被伪造绕过，不能防止逆向分析。属访问增强而非 DRM。
 - 构建期密码不要写入仓库、脚本、README、命令历史或 CI 明文日志。`access.yaml` 含明文构建密码，仅本地维护，已加入 `.gitignore`。
 - `content/plain` 目录用于构建期明文源文档，正式发布前应确认没有把真实私密资料提交到版本库。
@@ -350,11 +346,11 @@ CryptoWitch 提供的是本地资料包的防护增强，**不是 DRM，也不�
 - **划词 AI 解读会突破纯本地边界**：划选的文档片段会发送到 `access.yaml` 中配置的 LLM `endpoint`，请仅在受信任的 AI 服务下使用。对话上下文与历史仅保存在解锁会话内存中，锁定或关闭后清空，不落盘。
 - `access.yaml` 的 `ai.apiKey` 是明文凭证，构建期编译进 exe，**不受 vault 密码保护**：分发出去的 exe 可被 `strings`/binwalk 等工具直接提取 apiKey 与 endpoint，攻击者无需解锁即可绕过应用直连 AI 后端。请勿嵌入高价值长期凭证，与构建密码一样仅本地维护、不要提交仓库、脚本或命令历史。
 - **Markdown 链接协议消毒**：渲染时仅保留 `http/https`、`mailto` 与相对路径链接，`javascript:`、`data:`、`vbscript:` 等协议会被清除，降低恶意文档触发 XSS 的风险。
-- **CSP 纵深防御**：生产构建会为页面注入 Content-Security-Policy（`script-src 'self'`、`connect-src 'self'`、`object-src 'none'` 等），即使文档中出现恶意内容也无法向外部服务发送数据或执行内联脚本之外的动作。
+- **CSP 纵深防御**：桌面壳的资源处理器向 HTML 注入 CSP，包括 `script-src 'self'`、`connect-src 'self'`、`object-src 'none'`；样式允许 `unsafe-inline`，PDF 允许 `blob:` frame。它约束 WebView 页面资源，不约束 Go 后端发出的 AI 请求，也不能代替内容消毒。
 - **远程图片默认禁止**：`config.yaml` 的 `vault.allowRemoteImages` 默认 `false`，文档中的外链图片不会加载，避免打开文档时向图源泄露 IP 与阅读行为；确需在线图片时再显式开启。
 - **AI 请求有长度上限**：划选片段最多取前 4000 字符，问题与单条历史消息各以 8000 字符为上限，多轮追问仅携带最近 12 条历史消息。由于对话接口是无状态请求，多轮追问时每轮都会重新携带划选片段；如对 token 成本敏感，可后续引入服务端会话缓存。
 - **解锁失败限速**：连续 5 次密码错误后进入冷却（约 30 秒起，随失败次数递增，最长约 8 分钟），抑制在线暴力猜解。注意离线爆破仍取决于密码强度，务必使用足够强的密码。
-- **明文内存残留**：解密后的文档正文与渲染 HTML 在解锁会话内以进程内存形式存在；锁定时密钥与缓冲区会被主动清零，但 Go 字符串不可变、无法即时清零，明文副本需等待 GC 回收。锁定后短时间内内存转储仍可能读出已查看过的内容，属运行时的固有限制。
+- **明文内存残留**：解密缓冲区用后会尽力清零；锁定会撤销会话、取消 AI 请求、丢弃 AEAD 与 HTML 缓存引用，前端撤销 PDF Blob URL 并清空会话。Go 字符串、密码字符串和 AEAD 内部状态不保证立即擦除，不能承诺锁定后内存中已无明文或密钥残留。
 
 ## 常见问题
 
@@ -380,7 +376,7 @@ CryptoWitch 提供的是本地资料包的防护增强，**不是 DRM，也不�
 
 ### 克隆仓库后运行 `go test ./...` 或 `go build` 失败怎么办？
 
-`internal/vault/generated.go` 不再随仓库提交。先复制并编辑 `access.yaml`，再执行 `go run ./cmd/packdocs` 生成 vault 即可。
+先准备至少一份非空文档与本地 `access.yaml`，执行 `go run ./cmd/packdocs`，再在 `frontend/` 安装依赖并执行 `pnpm build`。仓库未提交 `frontend/dist`，根包的 `go:embed` 与实际桌面运行都需要先准备前端产物。
 
 ### 可以只打包 Markdown，不放 PDF 吗？
 
@@ -397,3 +393,7 @@ PDF 可能比普通 Markdown 大很多。分块加密和按块解密可避免在
 ### `pnpm run build` 已经生成了 `frontend/dist`，为什么还要 Wails 构建？
 
 `pnpm run build` 只生成前端静态资源。Wails 构建会把前端资源、Go 后端服务和加密 vault 一起编译进最终桌面应用。
+
+## 许可
+
+当前仓库未提供项目级 `LICENSE`。Wails、Vue 等依赖各自的许可证不等同于本项目源码和打包文档的使用授权。
